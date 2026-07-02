@@ -17,6 +17,7 @@ func GenerateId() string {
 	return hex.EncodeToString(id)
 }
 func CreateRoom(w http.ResponseWriter, r *http.Request) {
+	LoadRoom()
 	fmt.Println("== CreateRoom called ==")
 
 	if r.Method != http.MethodPost {
@@ -64,6 +65,7 @@ func CreateRoom(w http.ResponseWriter, r *http.Request) {
 	}
 
 	rooms[roomID] = room
+	SaveRoom()
 
 	fmt.Println("Rooms in map:", len(rooms))
 	fmt.Println("Redirecting to:", "/room?id="+roomID)
