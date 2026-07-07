@@ -12,6 +12,7 @@ func ClaimCode(w http.ResponseWriter, r *http.Request) {
 
 	room, exist := rooms[roomID]
 	if !exist {
+
 		http.Error(w, "room id not found", http.StatusNotFound)
 		return
 	}
