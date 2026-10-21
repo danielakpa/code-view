@@ -1,31 +1,26 @@
 from django.shortcuts import render, redirect
-from .forms import RegisterForm
 from django.contrib.auth import login
+from .forms import RegisterForm
 
 
 def register(request):
-    # Check if the user submitted the registration form.
+    # Check whether the user submitted the registration form.
     if request.method == "POST":
-
-        # Collect and validate the submitted information.
         form = RegisterForm(request.POST)
 
-      if form.is_valid():
-    # Create the new user.
-    user = form.save()
+        if form.is_valid():
+            # Create the user account in PostgreSQL.
+            user = form.save()
 
-    # Automatically log the user in.
-    login(request, user)
+            # Automatically log the new user in.
+            login(request, user)
 
-    # Send the user to the community.
-    return redirect("community")
+            # Redirect directly to the Community page.
+            return redirect("community")
 
     else:
-        # Display an empty form when the page first opens.
+        # Display an empty registration form.
         form = RegisterForm()
 
-    # Display the registration page and its form.
+    # Show the form again if registration fails.
     return render(request, "users/register.html", {"form": form})
-
-
-

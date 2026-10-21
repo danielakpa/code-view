@@ -16,15 +16,23 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
+
+# Import the homepage function.
 from home.views import home
 
+# Import the community page function.
+from community.views import community
+
+
 urlpatterns = [
-    # Django administration page.
     path("admin/", admin.site.urls),
 
-    # CodeView homepage.
+    # Homepage
     path("", home, name="home"),
 
-    # Account registration and login URLs.
+    # Registration
     path("", include("users.urls")),
+
+    # Community page
+    path("community/", community, name="community"),
 ]

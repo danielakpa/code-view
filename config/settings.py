@@ -40,7 +40,8 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'home',                                  # Our CodeView home page app
-    'users',                                 # Handles CodeView user accounts
+    'users',
+    'community'                                 # Handles CodeView user accounts
 
     
 ]

@@ -1,1 +1,0 @@
-from community.views import community
