@@ -26,7 +26,7 @@ def register(request):
     # Show the form again if registration fails.
     return render(request, "users/register.html", {"form": form})
 
-    def user_login(request):
+def user_login(request):
     # Check whether the user submitted the login form.
     if request.method == "POST":
 
