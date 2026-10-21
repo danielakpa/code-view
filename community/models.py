@@ -83,3 +83,81 @@ class Like(models.Model):
 
     def __str__(self):
         return f"{self.user} liked post {self.post_id}"
+
+# ========================================
+# PROJECT GROUP MODELS
+# ========================================
+
+
+class ProjectGroup(models.Model):
+    """Store developer collaboration groups."""
+
+    # The name of the project group.
+    name = models.CharField(max_length=100)
+
+    # Explain what the group is building.
+    description = models.TextField()
+
+    # The developer who created the group.
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="owned_project_groups",
+    )
+
+    # Public groups are discoverable.
+    # Private groups require permission to join.
+    is_private = models.BooleanField(default=False)
+
+    # Record when the group was created.
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return self.name
+
+
+class GroupMember(models.Model):
+    """Store developers who belong to a project group."""
+
+    # The group the developer belongs to.
+    group = models.ForeignKey(
+        ProjectGroup,
+        on_delete=models.CASCADE,
+        related_name="memberships",
+    )
+
+    # The developer joining the group.
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+    )
+
+    # A member can be an admin or regular member.
+    ROLE_CHOICES = [
+        ("admin", "Admin"),
+        ("member", "Member"),
+    ]
+
+    role = models.CharField(
+        max_length=10,
+        choices=ROLE_CHOICES,
+        default="member",
+    )
+
+    # Record when the developer joined.
+    joined_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        # Prevent duplicate membership.
+        constraints = [
+            models.UniqueConstraint(
+                fields=["group", "user"],
+                name="unique_project_group_member",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.user} in {self.group.name}"

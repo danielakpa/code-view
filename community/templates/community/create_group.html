@@ -1,0 +1,154 @@
+
+{% load static %}
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Create Group | CodeView</title>
+
+    <!-- Use the same stylesheet as the Groups page. -->
+    <link
+        rel="stylesheet"
+        href="{% static 'community/groups.css' %}"
+    >
+</head>
+
+<body>
+
+    <!-- ========================================
+         1. TOP NAVIGATION
+    ========================================= -->
+
+    <header class="navbar">
+
+        <a href="{% url 'community' %}" class="brand">
+            &lt;/&gt; CodeView
+        </a>
+
+        <nav class="top-links">
+
+            <a href="{% url 'community' %}">
+                Community
+            </a>
+
+            <a href="{% url 'groups' %}" class="active">
+                Groups
+            </a>
+
+            <span>Code Board (Coming soon)</span>
+
+        </nav>
+
+        <div class="profile">
+            <span class="avatar">
+                {{ request.user.username|first|upper }}
+            </span>
+
+            <span>{{ request.user.username }}</span>
+        </div>
+
+    </header>
+
+    <!-- ========================================
+         2. CREATE GROUP FORM
+    ========================================= -->
+
+    <main class="form-page">
+
+        <section class="form-card">
+
+            <a href="{% url 'groups' %}" class="back-link">
+                ← Back to Groups
+            </a>
+
+            <h1>Create a Project Group</h1>
+
+            <p class="form-intro">
+                Start a group where developers can collaborate
+                on a project.
+            </p>
+
+            <form method="POST" action="{% url 'create_group' %}">
+
+                {% csrf_token %}
+
+                <!-- Display general form errors. -->
+                {{ form.non_field_errors }}
+
+                <!-- Group name. -->
+                <div class="form-field">
+
+                    <label for="{{ form.name.id_for_label }}">
+                        Group Name
+                    </label>
+
+                    {{ form.name }}
+
+                    {{ form.name.errors }}
+
+                </div>
+
+                <!-- Group description. -->
+                <div class="form-field">
+
+                    <label for="{{ form.description.id_for_label }}">
+                        Description
+                    </label>
+
+                    {{ form.description }}
+
+                    {{ form.description.errors }}
+
+                </div>
+
+                <!-- Group privacy setting. -->
+                <div class="privacy-option">
+
+                    {{ form.is_private }}
+
+                    <div>
+
+                        <label for="{{ form.is_private.id_for_label }}">
+                            Make this group private
+                        </label>
+
+                        <p>
+                            Private groups are only visible to members.
+                            Public groups can be discovered by developers.
+                        </p>
+
+                    </div>
+
+                </div>
+
+                {{ form.is_private.errors }}
+
+                <!-- Form buttons. -->
+                <div class="form-actions">
+
+                    <a
+                        href="{% url 'groups' %}"
+                        class="secondary-button"
+                    >
+                        Cancel
+                    </a>
+
+                    <button type="submit" class="primary-button">
+                        Create Group
+                    </button>
+
+                </div>
+
+            </form>
+
+        </section>
+
+    </main>
+
+</body>
+
+</html>

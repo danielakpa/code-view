@@ -1,0 +1,202 @@
+
+{% load static %}
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>{{ group.name }} | CodeView</title>
+
+    <!-- Reuse the Project Groups stylesheet. -->
+    <link
+        rel="stylesheet"
+        href="{% static 'community/groups.css' %}"
+    >
+</head>
+
+<body>
+
+    <!-- ========================================
+         TOP NAVIGATION
+    ========================================= -->
+
+    <header class="navbar">
+
+        <a href="{% url 'community' %}" class="brand">
+            &lt;/&gt; CodeView
+        </a>
+
+        <nav class="top-links">
+
+            <a href="{% url 'community' %}">
+                Community
+            </a>
+
+            <a href="{% url 'groups' %}" class="active">
+                Groups
+            </a>
+
+            <span>Code Board (Coming soon)</span>
+
+        </nav>
+
+        <div class="profile">
+
+            <span class="avatar">
+                {{ request.user.username|first|upper }}
+            </span>
+
+            <span>{{ request.user.username }}</span>
+
+        </div>
+
+    </header>
+
+    <!-- ========================================
+         GROUP WORKSPACE
+    ========================================= -->
+
+    <main class="page-container">
+
+        <!-- Back navigation. -->
+        <a href="{% url 'groups' %}" class="back-link">
+            ← Back to Groups
+        </a>
+
+        <!-- Group information. -->
+        <section class="group-workspace-header">
+
+            <div>
+
+                <h1>{{ group.name }}</h1>
+
+                {% if group.is_private %}
+
+                    <span class="privacy-badge private">
+                        Private Group
+                    </span>
+
+                {% else %}
+
+                    <span class="privacy-badge public">
+                        Public Group
+                    </span>
+
+                {% endif %}
+
+                <!-- Description is visible only inside the group. -->
+                <p class="workspace-description">
+                    {{ group.description|linebreaksbr }}
+                </p>
+
+                <p class="group-owner">
+                    Created by @{{ group.owner.username }}
+                </p>
+
+            </div>
+
+        </section>
+
+        <!-- ========================================
+             GROUP FEATURES
+        ========================================= -->
+
+        <section class="workspace-grid">
+
+            <article class="group-card">
+
+                <h2>Group Discussions</h2>
+
+                <p class="group-description">
+                    Share project updates, ask questions,
+                    and discuss ideas with your team.
+                </p>
+
+                <span class="coming-soon">
+                    Coming next
+                </span>
+
+            </article>
+
+            <article class="group-card">
+
+                <h2>Code Board</h2>
+
+                <p class="group-description">
+                    Collaborate on code with one active editor
+                    and a queue for other developers.
+                </p>
+
+                <span class="coming-soon">
+                    Coming next
+                </span>
+
+            </article>
+
+            <article class="group-card">
+
+                <h2>Group Meetings</h2>
+
+                <p class="group-description">
+                    Organize meetings and collaborate
+                    with other group members.
+                </p>
+
+                <span class="coming-soon">
+                    Planned feature
+                </span>
+
+            </article>
+
+        </section>
+
+        <!-- ========================================
+             GROUP MEMBERS
+        ========================================= -->
+
+        <section class="members-section">
+
+            <h2>Group Members ({{ members|length }})</h2>
+
+            <div class="members-list">
+
+                {% for membership in members %}
+
+                    <div class="member-item">
+
+                        <span class="avatar">
+                            {{ membership.user.username|first|upper }}
+                        </span>
+
+                        <div>
+
+                            <strong>
+                                @{{ membership.user.username }}
+                            </strong>
+
+                            <small>
+                                {% if membership.user_id == group.owner_id %}
+                                    Owner
+                                {% else %}
+                                    {{ membership.get_role_display }}
+                                {% endif %}
+                            </small>
+
+                        </div>
+
+                    </div>
+
+                {% endfor %}
+
+            </div>
+
+        </section>
+
+    </main>
+
+</body>
+
+</html>
