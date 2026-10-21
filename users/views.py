@@ -1,7 +1,8 @@
 from django.shortcuts import render, redirect
 from django.contrib.auth import login
-from django.contrib.auth import authenticate, login
+from django.contrib.auth import authenticate, login, logout
 from .forms import RegisterForm
+from django.views.decorators.http import require_POST
 
 
 def register(request):
@@ -57,3 +58,12 @@ def user_login(request):
 
     # Display the login page when someone first visits.
     return render(request, "users/login.html")
+
+
+@require_POST
+def user_logout(request):
+    # Log the user out.
+    logout(request)
+
+    # Redirect to the homepage.
+    return redirect("home")
