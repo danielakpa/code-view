@@ -1,14 +1,66 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Community | CodeView</title>
+
+    <!-- Load our community stylesheet. -->
+    <link rel="stylesheet" href="{% static 'community/community.css' %}">
 </head>
 <body>
-    <h1>Welcome to the CodeView Community!</h1>
 
-    <p>Hello, {{ request.user.username }}!</p>
+    <!-- Top navigation -->
+    <header class="navbar">
+        <h2>CodeView</h2>
+        <div class="profile">
+            <span>{{ request.user.username }}</span>
+        </div>
+    </header>
 
-    <p>Connect with programmers, share code, and ask questions.</p>
+    <div class="layout">
+
+        <!-- Community navigation -->
+        <aside class="sidebar">
+            <h3>Community</h3>
+            <a href="{% url 'community' %}">Feed</a>
+            <span>Project Groups (Coming soon)</span>
+            <span>Code Board (Coming soon)</span>
+        </aside>
+
+        <!-- Main feed -->
+        <main class="feed">
+            <h1>Welcome, {{ request.user.username }}!</h1>
+            <p>Connect, share code, and learn with developers.</p>
+
+            <!-- Post composer preview -->
+            <section class="post-box">
+                <h3>Share something with the community</h3>
+                <textarea placeholder="Ask a question or share your code..." disabled></textarea>
+                <button disabled>Create Post (Coming soon)</button>
+            </section>
+
+            <!-- Example post -->
+            <article class="post">
+                <h3>Developer Community</h3>
+                <h4>How do you handle errors in Python?</h4>
+                <p>Share your approach to handling exceptions in real projects.</p>
+
+                <div class="post-actions">
+                    <span>Like</span>
+                    <span>Comment</span>
+                    <span>Share</span>
+                </div>
+            </article>
+        </main>
+
+        <!-- Right sidebar -->
+        <aside class="rightbar">
+            <h3>Explore CodeView</h3>
+            <p>Discover project groups, collaborate, and share knowledge.</p>
+        </aside>
+
+    </div>
 </body>
 </html>
