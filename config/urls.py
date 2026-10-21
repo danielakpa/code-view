@@ -20,8 +20,6 @@ from django.urls import path, include
 # Import the homepage function.
 from home.views import home
 
-# Import the community page function.
-from community.views import community
 
 
 urlpatterns = [
@@ -34,5 +32,5 @@ urlpatterns = [
     path("", include("users.urls")),
 
     # Community page
-    path("community/", community, name="community"),
+    path("community/", include("community.urls")),
 ]

@@ -12,166 +12,192 @@
 
     <!-- Top navigation -->
     <header class="navbar">
-        <a class="brand" href="{% url 'community' %}">
-            <span class="brand-icon">&lt;/&gt;</span>
-            CodeView
-        </a>
+        <a class="brand" href="{% url 'community' %}">&lt;/&gt; CodeView</a>
 
-        <nav class="top-links" aria-label="Main navigation">
-            <a class="active" href="{% url 'community' %}">Community</a>
-            <span>Groups — Soon</span>
-            <span>Code Board — Soon</span>
+        <nav class="top-links">
+            <a href="{% url 'community' %}" class="active">Community</a>
+            <span>Groups (Coming soon)</span>
+            <span>Code Board (Coming soon)</span>
         </nav>
 
         <div class="profile">
-            <span class="avatar">
-                {{ request.user.username|first|upper }}
-            </span>
+            <span class="avatar">{{ request.user.username|first|upper }}</span>
             <span>{{ request.user.username }}</span>
         </div>
     </header>
 
-    <!-- Dashboard -->
     <div class="layout">
 
-        <!-- Left sidebar -->
+        <!-- Left navigation -->
         <aside class="sidebar">
             <h3>Workspace</h3>
-
-            <a class="selected" href="{% url 'community' %}">
-                Community Feed
-            </a>
-
-            <span>My Groups — Coming soon</span>
-            <span>Code Board — Coming soon</span>
-            <span>Messages — Coming soon</span>
-
-            <div class="sidebar-note">
-                <strong>CodeView</strong>
-                <p>Learn, collaborate, and grow as a developer.</p>
-            </div>
+            <a href="{% url 'community' %}" class="selected">Community Feed</a>
+            <span>Project Groups (Coming soon)</span>
+            <span>Code Board (Coming soon)</span>
+            <span>Messages (Coming soon)</span>
         </aside>
 
-        <!-- Main community area -->
+        <!-- Main feed -->
         <main class="feed">
-
             <div class="welcome">
-                <span class="eyebrow">DEVELOPER COMMUNITY</span>
-
                 <h1>Welcome, {{ request.user.username }}!</h1>
-
-                <p>
-                    Ask questions, share knowledge, and connect
-                    with other programmers.
-                </p>
+                <p>Ask questions, share code, and learn with developers.</p>
             </div>
 
-            <!-- Create community post -->
+            <!-- Publish a community post without a title -->
             <section class="post-box">
-                <h2>Share with the community</h2>
+                <h2>Create a Post</h2>
 
-                <p class="section-description">
-                    Share an idea, question, explanation, or code snippet.
-                    No post title is required.
-                </p>
-
-                <form method="POST">
+                <form method="POST" action="{% url 'community' %}">
                     {% csrf_token %}
 
                     {{ form.non_field_errors }}
 
-                    <!-- Community posts use content only -->
                     <label for="{{ form.content.id_for_label }}">
-                        Your post
+                        What would you like to share?
                     </label>
 
                     {{ form.content }}
                     {{ form.content.errors }}
 
                     <div class="composer-footer">
-                        <span>Share something useful with developers.</span>
+                        <span>Share a question, idea, or code snippet.</span>
                         <button type="submit">Publish Post</button>
                     </div>
                 </form>
             </section>
 
-            <!-- Community feed -->
+            <!-- Posts stored in PostgreSQL -->
             <section class="community-posts">
-                <div class="section-heading">
-                    <h2>Community Feed</h2>
-                    <span>Latest discussions</span>
-                </div>
+                <h2>Community Feed</h2>
 
                 {% for post in posts %}
-                    <article class="post">
+                    <article class="post" id="post-{{ post.id }}">
 
-                        <!-- Post author -->
                         <div class="post-header">
-                            <div class="avatar">
+                            <span class="avatar">
                                 {{ post.author.username|first|upper }}
-                            </div>
+                            </span>
 
-                            <div class="author-info">
-                                <strong>
-                                    @{{ post.author.username }}
-                                </strong>
-
+                            <div>
+                                <strong>@{{ post.author.username }}</strong>
                                 <small>
                                     {{ post.created_at|date:"M d, Y - H:i" }}
                                 </small>
                             </div>
                         </div>
 
-                        <!-- Text or code shared by user -->
-                        <div class="post-content">
-                            {{ post.content }}
+                        <!-- Preserve pasted code spacing -->
+                        <div class="post-content">{{ post.content }}</div>
+
+                        <!-- Like, Comment, and Share controls -->
+                        <div class="post-actions">
+
+                            <!-- Like or unlike the post -->
+                            <form method="POST"
+                                  action="{% url 'toggle_like' post.id %}">
+                                {% csrf_token %}
+                                <button type="submit" class="action-button">
+                                    ♡ Like ({{ post.likes_count }})
+                                </button>
+                            </form>
+
+                            <!-- Jump to the comments section -->
+                            <a class="action-button"
+                               href="#comments-{{ post.id }}">
+                                💬 Comment ({{ post.comments_count }})
+                            </a>
+
+                            <!-- Copy a direct link to this post -->
+                            <button type="button"
+                                    class="action-button share-button"
+                                    data-share-url="{% url 'community' %}#post-{{ post.id }}">
+                                ↗ Share
+                            </button>
                         </div>
 
-                        <!-- Informational footer -->
-                        <div class="post-footer">
-                            <span>Community discussion</span>
+                        <!-- Comments underneath the post -->
+                        <div class="comments" id="comments-{{ post.id }}">
+                            <h3>Comments</h3>
+
+                            {% for comment in post.comments.all %}
+                                <div class="comment">
+                                    <strong>@{{ comment.author.username }}</strong>
+                                    <p>{{ comment.content|linebreaksbr }}</p>
+                                    <small>
+                                        {{ comment.created_at|date:"M d, Y - H:i" }}
+                                    </small>
+                                </div>
+                            {% empty %}
+                                <p class="muted">No comments yet.</p>
+                            {% endfor %}
+
+                            <!-- Add a comment -->
+                            <form method="POST"
+                                  action="{% url 'add_comment' post.id %}">
+                                {% csrf_token %}
+
+                                <label for="comment-{{ post.id }}">
+                                    Write a comment
+                                </label>
+
+                                <textarea
+                                    id="comment-{{ post.id }}"
+                                    name="content"
+                                    rows="2"
+                                    maxlength="2000"
+                                    placeholder="Share your thoughts..."
+                                    required></textarea>
+
+                                <button type="submit">Post Comment</button>
+                            </form>
                         </div>
 
                     </article>
                 {% empty %}
                     <div class="empty-state">
                         <h3>No posts yet</h3>
-                        <p>
-                            Be the first developer to share something!
-                        </p>
+                        <p>Be the first developer to share something!</p>
                     </div>
                 {% endfor %}
             </section>
-
         </main>
 
         <!-- Right sidebar -->
         <aside class="rightbar">
-
             <div class="info-card">
                 <h3>About CodeView</h3>
-                <p>
-                    A space where programmers learn,
-                    ask questions, and build projects together.
-                </p>
+                <p>A place for developers to share knowledge and grow together.</p>
             </div>
 
             <div class="info-card">
                 <h3>Coming Next</h3>
-
-                <p><strong>Project Groups</strong></p>
-                <p>Collaborate in public or private groups.</p>
-
-                <p><strong>Code Board</strong></p>
-                <p>
-                    Share persistent code with controlled
-                    editing access and a waiting queue.
-                </p>
+                <p>Project groups, collaborative Code Boards, and editing queues.</p>
             </div>
-
         </aside>
-
     </div>
+
+    <!-- Share links using the browser's share feature or clipboard -->
+    <script>
+        document.querySelectorAll(".share-button").forEach((button) => {
+            button.addEventListener("click", async () => {
+                const url = new URL(button.dataset.shareUrl, window.location.origin).href;
+
+                try {
+                    if (navigator.share) {
+                        await navigator.share({ title: "CodeView Post", url });
+                    } else {
+                        await navigator.clipboard.writeText(url);
+                        alert("Post link copied!");
+                    }
+                } catch (error) {
+                    if (error.name !== "AbortError") {
+                        window.prompt("Copy this post link:", url);
+                    }
+                }
+            });
+        });
+    </script>
 
 </body>
 </html>
