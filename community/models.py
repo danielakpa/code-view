@@ -1,23 +1,23 @@
-"""Database models for the CodeView Community."""
+"""Database models for CodeView Community."""
 
 from django.conf import settings
 from django.db import models
 
 
 class Post(models.Model):
-    """A post shared in the public community."""
+    """Store a post published by a developer."""
 
-    # The developer who published the post.
+    # The developer who created the post.
     author = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name="community_posts",
     )
 
-    # Community posts do not require titles.
+    # The post's text or pasted code.
     content = models.TextField()
 
-    # Record when the post was published.
+    # Date and time the post was created.
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -28,9 +28,9 @@ class Post(models.Model):
 
 
 class Comment(models.Model):
-    """A comment underneath a community post."""
+    """Store comments underneath community posts."""
 
-    # The post being discussed.
+    # The post this comment belongs to.
     post = models.ForeignKey(
         Post,
         on_delete=models.CASCADE,
@@ -46,6 +46,7 @@ class Comment(models.Model):
     # The comment message.
     content = models.TextField(max_length=2000)
 
+    # Date and time the comment was created.
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -56,26 +57,28 @@ class Comment(models.Model):
 
 
 class Like(models.Model):
-    """Record which developer liked which post."""
+    """Record which developer liked a post."""
 
+    # The post being liked.
     post = models.ForeignKey(
         Post,
         on_delete=models.CASCADE,
         related_name="likes",
     )
 
+    # The developer who liked the post.
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
     )
 
     class Meta:
-        # Prevent one developer from liking the same post twice.
+        # Each developer can like a particular post only once.
         constraints = [
             models.UniqueConstraint(
                 fields=["post", "user"],
                 name="unique_community_post_like",
-            )
+            ),
         ]
 
     def __str__(self):

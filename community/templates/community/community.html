@@ -1,54 +1,93 @@
 
 {% load static %}
+
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
     <title>Community | CodeView</title>
-    <link rel="stylesheet" href="{% static 'community/community.css' %}">
+
+    <!-- Community stylesheet -->
+    <link
+        rel="stylesheet"
+        href="{% static 'community/community.css' %}"
+    >
 </head>
+
 <body>
 
-    <!-- Top navigation -->
+    <!-- Main navigation -->
     <header class="navbar">
-        <a class="brand" href="{% url 'community' %}">&lt;/&gt; CodeView</a>
+
+        <a href="{% url 'community' %}" class="brand">
+            &lt;/&gt; CodeView
+        </a>
 
         <nav class="top-links">
-            <a href="{% url 'community' %}" class="active">Community</a>
+            <a href="{% url 'community' %}" class="active">
+                Community
+            </a>
+
             <span>Groups (Coming soon)</span>
             <span>Code Board (Coming soon)</span>
         </nav>
 
         <div class="profile">
-            <span class="avatar">{{ request.user.username|first|upper }}</span>
+            <span class="avatar">
+                {{ request.user.username|first|upper }}
+            </span>
+
             <span>{{ request.user.username }}</span>
         </div>
+
     </header>
 
+    <!-- Dashboard layout -->
     <div class="layout">
 
-        <!-- Left navigation -->
+        <!-- Left sidebar -->
         <aside class="sidebar">
+
             <h3>Workspace</h3>
-            <a href="{% url 'community' %}" class="selected">Community Feed</a>
+
+            <a href="{% url 'community' %}" class="selected">
+                Community Feed
+            </a>
+
             <span>Project Groups (Coming soon)</span>
             <span>Code Board (Coming soon)</span>
             <span>Messages (Coming soon)</span>
+
         </aside>
 
-        <!-- Main feed -->
+        <!-- Main community feed -->
         <main class="feed">
-            <div class="welcome">
-                <h1>Welcome, {{ request.user.username }}!</h1>
-                <p>Ask questions, share code, and learn with developers.</p>
-            </div>
 
-            <!-- Publish a community post without a title -->
+            <!-- Welcome message -->
+            <section class="welcome">
+
+                <h1>
+                    Welcome, {{ request.user.username }}!
+                </h1>
+
+                <p>
+                    Ask questions, share code, and learn with developers.
+                </p>
+
+            </section>
+
+            <!-- Create a new post -->
             <section class="post-box">
+
                 <h2>Create a Post</h2>
 
-                <form method="POST" action="{% url 'community' %}">
+                <form
+                    method="POST"
+                    action="{% url 'community' %}"
+                >
                     {% csrf_token %}
 
                     {{ form.non_field_errors }}
@@ -61,80 +100,146 @@
                     {{ form.content.errors }}
 
                     <div class="composer-footer">
-                        <span>Share a question, idea, or code snippet.</span>
-                        <button type="submit">Publish Post</button>
+
+                        <span>
+                            Share a question, idea, or code snippet.
+                        </span>
+
+                        <button type="submit">
+                            Publish Post
+                        </button>
+
                     </div>
+
                 </form>
+
             </section>
 
-            <!-- Posts stored in PostgreSQL -->
+            <!-- All community posts -->
             <section class="community-posts">
+
                 <h2>Community Feed</h2>
 
                 {% for post in posts %}
-                    <article class="post" id="post-{{ post.id }}">
 
+                    <article
+                        class="post"
+                        id="post-{{ post.id }}"
+                    >
+
+                        <!-- Post author -->
                         <div class="post-header">
+
                             <span class="avatar">
                                 {{ post.author.username|first|upper }}
                             </span>
 
                             <div>
-                                <strong>@{{ post.author.username }}</strong>
+
+                                <strong>
+                                    @{{ post.author.username }}
+                                </strong>
+
                                 <small>
                                     {{ post.created_at|date:"M d, Y - H:i" }}
                                 </small>
+
                             </div>
+
                         </div>
 
-                        <!-- Preserve pasted code spacing -->
+                        <!-- Post content: preserve code formatting -->
                         <div class="post-content">{{ post.content }}</div>
 
-                        <!-- Like, Comment, and Share controls -->
+                        <!-- Post action buttons -->
                         <div class="post-actions">
 
-                            <!-- Like or unlike the post -->
-                            <form method="POST"
-                                  action="{% url 'toggle_like' post.id %}">
+                            <!-- Like button -->
+                            <form
+                                method="POST"
+                                action="{% url 'toggle_like' post.id %}"
+                            >
                                 {% csrf_token %}
-                                <button type="submit" class="action-button">
-                                    ♡ Like ({{ post.likes_count }})
+
+                                <button
+                                    type="submit"
+                                    class="action-button {% if post.is_liked %}liked{% endif %}"
+                                    aria-pressed="{% if post.is_liked %}true{% else %}false{% endif %}"
+                                >
+                                    {% if post.is_liked %}
+                                        ♥
+                                    {% else %}
+                                        ♡
+                                    {% endif %}
+
+                                    Like ({{ post.likes_count }})
                                 </button>
+
                             </form>
 
-                            <!-- Jump to the comments section -->
-                            <a class="action-button"
-                               href="#comments-{{ post.id }}">
+                            <!-- Show or hide comments -->
+                            <button
+                                type="button"
+                                class="action-button comment-toggle"
+                                aria-expanded="false"
+                                aria-controls="comments-{{ post.id }}"
+                                data-comment-id="comments-{{ post.id }}"
+                            >
                                 💬 Comment ({{ post.comments_count }})
-                            </a>
+                            </button>
 
-                            <!-- Copy a direct link to this post -->
-                            <button type="button"
-                                    class="action-button share-button"
-                                    data-share-url="{% url 'community' %}#post-{{ post.id }}">
+                            <!-- Share post -->
+                            <button
+                                type="button"
+                                class="action-button share-button"
+                                data-share-url="{% url 'community' %}#post-{{ post.id }}"
+                            >
                                 ↗ Share
                             </button>
+
                         </div>
 
-                        <!-- Comments underneath the post -->
-                        <div class="comments" id="comments-{{ post.id }}">
+                        <!-- Comments hidden by default -->
+                        <div
+                            class="comments"
+                            id="comments-{{ post.id }}"
+                            hidden
+                        >
+
                             <h3>Comments</h3>
 
+                            <!-- Existing comments -->
                             {% for comment in post.comments.all %}
+
                                 <div class="comment">
-                                    <strong>@{{ comment.author.username }}</strong>
-                                    <p>{{ comment.content|linebreaksbr }}</p>
+
+                                    <strong>
+                                        @{{ comment.author.username }}
+                                    </strong>
+
+                                    <p>
+                                        {{ comment.content|linebreaksbr }}
+                                    </p>
+
                                     <small>
                                         {{ comment.created_at|date:"M d, Y - H:i" }}
                                     </small>
+
                                 </div>
+
                             {% empty %}
-                                <p class="muted">No comments yet.</p>
+
+                                <p class="muted">
+                                    No comments yet.
+                                </p>
+
                             {% endfor %}
 
-                            <!-- Add a comment -->
-                            <form method="POST"
-                                  action="{% url 'add_comment' post.id %}">
+                            <!-- Comment form -->
+                            <form
+                                method="POST"
+                                action="{% url 'add_comment' post.id %}"
+                            >
                                 {% csrf_token %}
 
                                 <label for="comment-{{ post.id }}">
@@ -147,57 +252,73 @@
                                     rows="2"
                                     maxlength="2000"
                                     placeholder="Share your thoughts..."
-                                    required></textarea>
+                                    required
+                                ></textarea>
 
-                                <button type="submit">Post Comment</button>
+                                <button type="submit">
+                                    Post Comment
+                                </button>
+
                             </form>
+
                         </div>
 
                     </article>
+
                 {% empty %}
+
+                    <!-- Show when there are no posts -->
                     <div class="empty-state">
+
                         <h3>No posts yet</h3>
-                        <p>Be the first developer to share something!</p>
+
+                        <p>
+                            Be the first developer to share something!
+                        </p>
+
                     </div>
+
                 {% endfor %}
+
             </section>
+
         </main>
 
         <!-- Right sidebar -->
         <aside class="rightbar">
+
             <div class="info-card">
+
                 <h3>About CodeView</h3>
-                <p>A place for developers to share knowledge and grow together.</p>
+
+                <p>
+                    A place for developers to share knowledge
+                    and grow together.
+                </p>
+
             </div>
 
             <div class="info-card">
+
                 <h3>Coming Next</h3>
-                <p>Project groups, collaborative Code Boards, and editing queues.</p>
+
+                <p>
+                    Project groups, collaborative Code Boards,
+                    and editing queues.
+                </p>
+
             </div>
+
         </aside>
+
     </div>
 
-    <!-- Share links using the browser's share feature or clipboard -->
-    <script>
-        document.querySelectorAll(".share-button").forEach((button) => {
-            button.addEventListener("click", async () => {
-                const url = new URL(button.dataset.shareUrl, window.location.origin).href;
-
-                try {
-                    if (navigator.share) {
-                        await navigator.share({ title: "CodeView Post", url });
-                    } else {
-                        await navigator.clipboard.writeText(url);
-                        alert("Post link copied!");
-                    }
-                } catch (error) {
-                    if (error.name !== "AbortError") {
-                        window.prompt("Copy this post link:", url);
-                    }
-                }
-            });
-        });
-    </script>
+    <!-- Load JavaScript from its own file -->
+    <script
+        src="{% static 'community/community.js' %}"
+        defer
+    ></script>
 
 </body>
+
 </html>

@@ -1,5 +1,7 @@
 
-/* CodeView Community - Charcoal Gray Theme */
+/* ========================================
+   CODEVIEW COMMUNITY THEME
+======================================== */
 
 :root {
     --background: #18181b;
@@ -11,6 +13,11 @@
     --text: #fafafa;
     --muted: #a1a1aa;
 }
+
+
+/* ========================================
+   GENERAL STYLES
+======================================== */
 
 * {
     box-sizing: border-box;
@@ -38,7 +45,25 @@ textarea {
     font: inherit;
 }
 
-/* Top navigation */
+button {
+    padding: 11px 18px;
+    background: var(--accent);
+    color: #111827;
+    border: none;
+    border-radius: 8px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+button:hover {
+    background: var(--accent-hover);
+}
+
+
+/* ========================================
+   TOP NAVIGATION
+======================================== */
+
 .navbar {
     display: flex;
     justify-content: space-between;
@@ -92,7 +117,11 @@ textarea {
     font-weight: bold;
 }
 
-/* Dashboard layout */
+
+/* ========================================
+   DASHBOARD LAYOUT
+======================================== */
+
 .layout {
     display: grid;
     grid-template-columns: 220px minmax(0, 1fr) 250px;
@@ -102,7 +131,15 @@ textarea {
     padding: 0 24px;
 }
 
-/* Sidebars */
+.feed {
+    min-width: 0;
+}
+
+
+/* ========================================
+   SIDEBARS
+======================================== */
+
 .sidebar,
 .info-card {
     padding: 20px;
@@ -150,10 +187,10 @@ textarea {
     color: var(--accent);
 }
 
-/* Main content */
-.feed {
-    min-width: 0;
-}
+
+/* ========================================
+   WELCOME SECTION
+======================================== */
 
 .welcome {
     margin-bottom: 24px;
@@ -168,6 +205,11 @@ textarea {
 .muted {
     color: var(--muted);
 }
+
+
+/* ========================================
+   POST CREATION
+======================================== */
 
 .post-box,
 .post,
@@ -214,20 +256,6 @@ textarea::placeholder {
     color: var(--muted);
 }
 
-button {
-    padding: 11px 18px;
-    border: 0;
-    border-radius: 8px;
-    background: var(--accent);
-    color: #111827;
-    font-weight: bold;
-    cursor: pointer;
-}
-
-button:hover {
-    background: var(--accent-hover);
-}
-
 .composer-footer {
     display: flex;
     align-items: center;
@@ -241,7 +269,11 @@ button:hover {
     font-size: 13px;
 }
 
-/* Community posts */
+
+/* ========================================
+   COMMUNITY POSTS
+======================================== */
+
 .community-posts {
     margin-top: 30px;
 }
@@ -273,7 +305,7 @@ button:hover {
     font-size: 12px;
 }
 
-/* Preserve code indentation and line breaks */
+/* Preserve indentation when developers paste code. */
 .post-content {
     white-space: pre-wrap;
     overflow-wrap: anywhere;
@@ -281,7 +313,11 @@ button:hover {
     margin-bottom: 18px;
 }
 
-/* Like, comment, and share */
+
+/* ========================================
+   LIKE, COMMENT, AND SHARE
+======================================== */
+
 .post-actions {
     display: flex;
     align-items: center;
@@ -315,7 +351,35 @@ button:hover {
     color: var(--accent);
 }
 
-/* Comments */
+/* Green when the logged-in developer liked the post. */
+.action-button.liked {
+    color: #22c55e;
+    border-color: #22c55e;
+    background: #14532d;
+}
+
+.action-button.liked:hover {
+    color: #bbf7d0;
+    background: #166534;
+}
+
+/* Highlight the Comment button while comments are open. */
+.comment-toggle[aria-expanded="true"] {
+    color: #22c55e;
+    border-color: #22c55e;
+    background: #14532d;
+}
+
+
+/* ========================================
+   COMMENTS
+======================================== */
+
+/* Keep comments hidden until opened. */
+.comments[hidden] {
+    display: none;
+}
+
 .comments {
     padding-top: 18px;
 }
@@ -351,6 +415,11 @@ button:hover {
     margin-top: 10px;
 }
 
+
+/* ========================================
+   EMPTY STATE AND ERRORS
+======================================== */
+
 .empty-state {
     text-align: center;
 }
@@ -363,8 +432,13 @@ button:hover {
     color: #fca5a5;
 }
 
-/* Tablet */
+
+/* ========================================
+   TABLET RESPONSIVENESS
+======================================== */
+
 @media (max-width: 1100px) {
+
     .layout {
         grid-template-columns: 200px minmax(0, 1fr);
     }
@@ -372,10 +446,16 @@ button:hover {
     .rightbar {
         display: none;
     }
+
 }
 
-/* Phone */
+
+/* ========================================
+   MOBILE RESPONSIVENESS
+======================================== */
+
 @media (max-width: 700px) {
+
     .navbar {
         flex-wrap: wrap;
         padding: 14px;
@@ -419,4 +499,5 @@ button:hover {
     .post-actions {
         gap: 8px;
     }
+
 }
