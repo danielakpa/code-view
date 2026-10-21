@@ -1,3 +1,4 @@
+
 {% load static %}
 <!DOCTYPE html>
 <html lang="en">
@@ -5,62 +6,172 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Community | CodeView</title>
-
-    <!-- Load our community stylesheet. -->
     <link rel="stylesheet" href="{% static 'community/community.css' %}">
 </head>
 <body>
 
     <!-- Top navigation -->
     <header class="navbar">
-        <h2>CodeView</h2>
+        <a class="brand" href="{% url 'community' %}">
+            <span class="brand-icon">&lt;/&gt;</span>
+            CodeView
+        </a>
+
+        <nav class="top-links" aria-label="Main navigation">
+            <a class="active" href="{% url 'community' %}">Community</a>
+            <span>Groups — Soon</span>
+            <span>Code Board — Soon</span>
+        </nav>
+
         <div class="profile">
+            <span class="avatar">
+                {{ request.user.username|first|upper }}
+            </span>
             <span>{{ request.user.username }}</span>
         </div>
     </header>
 
+    <!-- Dashboard -->
     <div class="layout">
 
-        <!-- Community navigation -->
+        <!-- Left sidebar -->
         <aside class="sidebar">
-            <h3>Community</h3>
-            <a href="{% url 'community' %}">Feed</a>
-            <span>Project Groups (Coming soon)</span>
-            <span>Code Board (Coming soon)</span>
+            <h3>Workspace</h3>
+
+            <a class="selected" href="{% url 'community' %}">
+                Community Feed
+            </a>
+
+            <span>My Groups — Coming soon</span>
+            <span>Code Board — Coming soon</span>
+            <span>Messages — Coming soon</span>
+
+            <div class="sidebar-note">
+                <strong>CodeView</strong>
+                <p>Learn, collaborate, and grow as a developer.</p>
+            </div>
         </aside>
 
-        <!-- Main feed -->
+        <!-- Main community area -->
         <main class="feed">
-            <h1>Welcome, {{ request.user.username }}!</h1>
-            <p>Connect, share code, and learn with developers.</p>
 
-            <!-- Post composer preview -->
+            <div class="welcome">
+                <span class="eyebrow">DEVELOPER COMMUNITY</span>
+
+                <h1>Welcome, {{ request.user.username }}!</h1>
+
+                <p>
+                    Ask questions, share knowledge, and connect
+                    with other programmers.
+                </p>
+            </div>
+
+            <!-- Create community post -->
             <section class="post-box">
-                <h3>Share something with the community</h3>
-                <textarea placeholder="Ask a question or share your code..." disabled></textarea>
-                <button disabled>Create Post (Coming soon)</button>
+                <h2>Share with the community</h2>
+
+                <p class="section-description">
+                    Share an idea, question, explanation, or code snippet.
+                    No post title is required.
+                </p>
+
+                <form method="POST">
+                    {% csrf_token %}
+
+                    {{ form.non_field_errors }}
+
+                    <!-- Community posts use content only -->
+                    <label for="{{ form.content.id_for_label }}">
+                        Your post
+                    </label>
+
+                    {{ form.content }}
+                    {{ form.content.errors }}
+
+                    <div class="composer-footer">
+                        <span>Share something useful with developers.</span>
+                        <button type="submit">Publish Post</button>
+                    </div>
+                </form>
             </section>
 
-            <!-- Example post -->
-            <article class="post">
-                <h3>Developer Community</h3>
-                <h4>How do you handle errors in Python?</h4>
-                <p>Share your approach to handling exceptions in real projects.</p>
-
-                <div class="post-actions">
-                    <span>Like</span>
-                    <span>Comment</span>
-                    <span>Share</span>
+            <!-- Community feed -->
+            <section class="community-posts">
+                <div class="section-heading">
+                    <h2>Community Feed</h2>
+                    <span>Latest discussions</span>
                 </div>
-            </article>
+
+                {% for post in posts %}
+                    <article class="post">
+
+                        <!-- Post author -->
+                        <div class="post-header">
+                            <div class="avatar">
+                                {{ post.author.username|first|upper }}
+                            </div>
+
+                            <div class="author-info">
+                                <strong>
+                                    @{{ post.author.username }}
+                                </strong>
+
+                                <small>
+                                    {{ post.created_at|date:"M d, Y - H:i" }}
+                                </small>
+                            </div>
+                        </div>
+
+                        <!-- Text or code shared by user -->
+                        <div class="post-content">
+                            {{ post.content }}
+                        </div>
+
+                        <!-- Informational footer -->
+                        <div class="post-footer">
+                            <span>Community discussion</span>
+                        </div>
+
+                    </article>
+                {% empty %}
+                    <div class="empty-state">
+                        <h3>No posts yet</h3>
+                        <p>
+                            Be the first developer to share something!
+                        </p>
+                    </div>
+                {% endfor %}
+            </section>
+
         </main>
 
         <!-- Right sidebar -->
         <aside class="rightbar">
-            <h3>Explore CodeView</h3>
-            <p>Discover project groups, collaborate, and share knowledge.</p>
+
+            <div class="info-card">
+                <h3>About CodeView</h3>
+                <p>
+                    A space where programmers learn,
+                    ask questions, and build projects together.
+                </p>
+            </div>
+
+            <div class="info-card">
+                <h3>Coming Next</h3>
+
+                <p><strong>Project Groups</strong></p>
+                <p>Collaborate in public or private groups.</p>
+
+                <p><strong>Code Board</strong></p>
+                <p>
+                    Share persistent code with controlled
+                    editing access and a waiting queue.
+                </p>
+            </div>
+
         </aside>
 
     </div>
+
 </body>
 </html>

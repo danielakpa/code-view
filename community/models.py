@@ -1,28 +1,27 @@
+
+"""Database models for CodeView Community."""
+
+from django.conf import settings
 from django.db import models
-from django.contrib.auth.models import User
 
 
 class Post(models.Model):
-    # The user who created the post.
+    # User who published the post.
     author = models.ForeignKey(
-        User,
+        settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
-        related_name="posts"
+        related_name="posts",
     )
 
-    # The title of the programming post.
-    title = models.CharField(max_length=200)
-
-    # The question, explanation, or code shared.
+    # Community posts contain text or pasted code.
     content = models.TextField()
 
-    # Automatically save when the post was created.
+    # Automatically record when the post was created.
     created_at = models.DateTimeField(auto_now_add=True)
 
-    # Show the newest posts first.
     class Meta:
+        # Newest posts appear first.
         ordering = ["-created_at"]
 
-    # How the post appears in Django Admin.
     def __str__(self):
-        return self.title
+        return f"Post by {self.author.username}"

@@ -1,32 +1,28 @@
-"""Forms for creating community posts."""
+
+"""Forms for CodeView Community."""
 
 from django import forms
 from .models import Post
 
 
 class PostForm(forms.ModelForm):
-    """Collect and validate information for a new post."""
+    """Validate content submitted to the community feed."""
 
     class Meta:
-        # Connect this form to our Post database model.
         model = Post
 
-        # These are the fields users can fill in.
-        fields = ["title", "content"]
+        # Community posts do not need a title.
+        fields = ["content"]
 
-        # Customize how the fields appear in HTML.
         widgets = {
-            "title": forms.TextInput(
-                attrs={
-                    "placeholder": "Enter your post title",
-                    "class": "post-input",
-                }
-            ),
             "content": forms.Textarea(
                 attrs={
-                    "placeholder": "Ask a question or share your code...",
                     "class": "post-textarea",
-                    "rows": 5,
+                    "placeholder": (
+                        "Ask a question, share an idea, "
+                        "or paste your code here..."
+                    ),
+                    "rows": 6,
                 }
             ),
         }
