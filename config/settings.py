@@ -130,3 +130,8 @@ MAILERS = {
         'BACKEND': 'django.core.mail.backends.console.EmailBackend',
     },
 }
+# Where users go after logging in.
+LOGIN_REDIRECT_URL = "community"
+
+# Where unauthenticated users are sent.
+LOGIN_URL = "login"
