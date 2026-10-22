@@ -23,35 +23,44 @@
          1. TOP NAVIGATION
     ========================================= -->
 
-    <header class="navbar">
+   <!-- ========================================
+     CODEVIEW GROUPS NAVIGATION
+======================================== -->
 
-        <a href="{% url 'community' %}" class="brand">
-            &lt;/&gt; CodeView
+<header class="navbar">
+
+    <!-- Clicking the logo opens the Groups Dashboard. -->
+    <a href="{% url 'groups' %}" class="brand">
+        &lt;/&gt; CodeView
+    </a>
+
+    <!-- Group navigation. -->
+    <nav class="top-links">
+
+        <a href="{% url 'groups' %}" class="active">
+            Groups
         </a>
 
-        <nav class="top-links">
+        <a href="{% url 'create_group' %}">
+            Create Group
+        </a>
 
-            <a href="{% url 'community' %}">
-                Community
-            </a>
+    </nav>
 
-            <a href="{% url 'groups' %}" class="active">
-                Groups
-            </a>
+    <!-- Logged-in developer profile. -->
+    <div class="profile">
 
-            <span>Code Board (Coming soon)</span>
+        <span class="avatar">
+            {{ request.user.username|first|upper }}
+        </span>
 
-        </nav>
+        <span>
+            {{ request.user.username }}
+        </span>
 
-        <div class="profile">
-            <span class="avatar">
-                {{ request.user.username|first|upper }}
-            </span>
+    </div>
 
-            <span>{{ request.user.username }}</span>
-        </div>
-
-    </header>
+</header>
 
     <!-- ========================================
          2. CREATE GROUP FORM

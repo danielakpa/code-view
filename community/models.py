@@ -1,115 +1,30 @@
-"""Database models for CodeView Community."""
+"""Database models for CodeView project groups."""
 
 from django.conf import settings
 from django.db import models
 
 
-class Post(models.Model):
-    """Store a post published by a developer."""
-
-    # The developer who created the post.
-    author = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
-        related_name="community_posts",
-    )
-
-    # The post's text or pasted code.
-    content = models.TextField()
-
-    # Date and time the post was created.
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        ordering = ["-created_at"]
-
-    def __str__(self):
-        return f"Post by {self.author}"
-
-
-class Comment(models.Model):
-    """Store comments underneath community posts."""
-
-    # The post this comment belongs to.
-    post = models.ForeignKey(
-        Post,
-        on_delete=models.CASCADE,
-        related_name="comments",
-    )
-
-    # The developer who wrote the comment.
-    author = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
-    )
-
-    # The comment message.
-    content = models.TextField(max_length=2000)
-
-    # Date and time the comment was created.
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        ordering = ["created_at"]
-
-    def __str__(self):
-        return f"Comment by {self.author}"
-
-
-class Like(models.Model):
-    """Record which developer liked a post."""
-
-    # The post being liked.
-    post = models.ForeignKey(
-        Post,
-        on_delete=models.CASCADE,
-        related_name="likes",
-    )
-
-    # The developer who liked the post.
-    user = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
-    )
-
-    class Meta:
-        # Each developer can like a particular post only once.
-        constraints = [
-            models.UniqueConstraint(
-                fields=["post", "user"],
-                name="unique_community_post_like",
-            ),
-        ]
-
-    def __str__(self):
-        return f"{self.user} liked post {self.post_id}"
-
-# ========================================
-# PROJECT GROUP MODELS
-# ========================================
-
+# ============================================================
+# 1. PROJECT GROUP
+# ============================================================
 
 class ProjectGroup(models.Model):
     """Store developer collaboration groups."""
 
-    # The name of the project group.
     name = models.CharField(max_length=100)
 
-    # Explain what the group is building.
     description = models.TextField()
 
-    # The developer who created the group.
+    # Developer who created the group.
     owner = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
         related_name="owned_project_groups",
     )
 
-    # Public groups are discoverable.
-    # Private groups require permission to join.
+    # False = public group; True = private group.
     is_private = models.BooleanField(default=False)
 
-    # Record when the group was created.
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -119,23 +34,24 @@ class ProjectGroup(models.Model):
         return self.name
 
 
-class GroupMember(models.Model):
-    """Store developers who belong to a project group."""
+# ============================================================
+# 2. GROUP MEMBER
+# ============================================================
 
-    # The group the developer belongs to.
+class GroupMember(models.Model):
+    """Store group memberships and member roles."""
+
     group = models.ForeignKey(
         ProjectGroup,
         on_delete=models.CASCADE,
         related_name="memberships",
     )
 
-    # The developer joining the group.
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
     )
 
-    # A member can be an admin or regular member.
     ROLE_CHOICES = [
         ("admin", "Admin"),
         ("member", "Member"),
@@ -147,11 +63,9 @@ class GroupMember(models.Model):
         default="member",
     )
 
-    # Record when the developer joined.
     joined_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        # Prevent duplicate membership.
         constraints = [
             models.UniqueConstraint(
                 fields=["group", "user"],
@@ -161,3 +75,64 @@ class GroupMember(models.Model):
 
     def __str__(self):
         return f"{self.user} in {self.group.name}"
+
+
+# ============================================================
+# 3. GROUP DISCUSSION
+# ============================================================
+
+class GroupDiscussion(models.Model):
+    """Store discussions created inside project groups."""
+
+    group = models.ForeignKey(
+        ProjectGroup,
+        on_delete=models.CASCADE,
+        related_name="discussions",
+    )
+
+    author = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="group_discussions",
+    )
+
+    title = models.CharField(max_length=200)
+
+    content = models.TextField()
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return self.title
+
+
+# ============================================================
+# 4. GROUP DISCUSSION COMMENT
+# ============================================================
+
+class GroupDiscussionComment(models.Model):
+    """Store comments underneath group discussions."""
+
+    discussion = models.ForeignKey(
+        GroupDiscussion,
+        on_delete=models.CASCADE,
+        related_name="comments",
+    )
+
+    author = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+    )
+
+    content = models.TextField(max_length=2000)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["created_at"]
+
+    def __str__(self):
+        return f"Comment by {self.author.username}"

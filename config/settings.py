@@ -132,7 +132,7 @@ MAILERS = {
     },
 }
 # Where users go after logging in.
-LOGIN_REDIRECT_URL = "community"
+LOGIN_REDIRECT_URL = "groups"
 
 # Where unauthenticated users are sent.
 LOGIN_URL = "login"
