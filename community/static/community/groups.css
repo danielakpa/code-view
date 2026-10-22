@@ -581,3 +581,36 @@ textarea {
 .group-card-footer form {
     margin: 0;
 }
+
+/* ============================================================
+   MEETING ROOM BUTTON
+============================================================ */
+
+/* Style the button used to enter a group's meeting room. */
+
+.group-action {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    padding: 12px 20px;
+    margin-top: 16px;
+
+    background-color: #22c55e;
+    color: #052e16;
+
+    border: none;
+    border-radius: 8px;
+
+    font-size: 14px;
+    font-weight: 700;
+    text-decoration: none;
+
+    transition: background-color 0.2s ease;
+}
+
+/* Change the button color when hovered. */
+
+.group-action:hover {
+    background-color: #16a34a;
+}

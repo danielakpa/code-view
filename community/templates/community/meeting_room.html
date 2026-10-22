@@ -1,0 +1,173 @@
+{% load static %}
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <!-- ========================================
+         1. PAGE SETTINGS
+    ========================================= -->
+
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>
+        {{ group.name }} Meeting Room | CodeView
+    </title>
+
+    <!-- Load the existing Groups stylesheet. -->
+    <link
+        rel="stylesheet"
+        href="{% static 'community/groups.css' %}"
+    >
+
+</head>
+
+<body>
+
+    <!-- ========================================
+         2. TOP NAVIGATION
+    ========================================= -->
+
+    <header class="navbar">
+
+        <!-- CodeView logo. -->
+        <a href="{% url 'groups' %}" class="brand">
+            &lt;/&gt; CodeView
+        </a>
+
+        <!-- Navigation links. -->
+        <nav class="top-links">
+
+            <a href="{% url 'groups' %}">
+                Groups
+            </a>
+
+            <a href="{% url 'group_detail' group.id %}">
+                Group Workspace
+            </a>
+
+        </nav>
+
+        <!-- Logged-in developer profile. -->
+        <div class="profile">
+
+            <span class="avatar">
+                {{ request.user.username|first|upper }}
+            </span>
+
+            <span>
+                {{ request.user.username }}
+            </span>
+
+        </div>
+
+    </header>
+
+    <!-- ========================================
+         3. MEETING ROOM CONTENT
+    ========================================= -->
+
+    <main class="page-container">
+
+        <!-- Back to group workspace. -->
+        <a
+            href="{% url 'group_detail' group.id %}"
+            class="back-link"
+        >
+            ← Back to Group
+        </a>
+
+        <!-- ========================================
+             4. MEETING ROOM HEADER
+        ========================================= -->
+
+        <section class="group-workspace-header">
+
+            <div>
+
+                <h1>
+                    {{ group.name }} — Meeting Room
+                </h1>
+
+                <p class="workspace-description">
+                    Your team's private collaboration workspace.
+                </p>
+
+            </div>
+
+        </section>
+
+        <!-- ========================================
+             5. MEETING ROOM FEATURES
+        ========================================= -->
+
+        <section class="workspace-grid">
+<!-- ========================================
+     CODE BOARD
+======================================== -->
+
+<article class="group-card">
+
+    <h2>
+        Code Board
+    </h2>
+
+    <p class="group-description">
+        Write, review, and save code with your team.
+    </p>
+
+    <!-- Open this group's shared Code Board. -->
+    <a
+        href="{% url 'code_board' group.id %}"
+        class="group-action"
+    >
+        Open Code Board
+    </a>
+
+</article>
+
+            <!-- ====================================
+                 VIDEO CALL
+            ==================================== -->
+
+            <article class="group-card">
+
+                <h2>
+                    Video Call
+                </h2>
+
+                <p class="group-description">
+                    Communicate face-to-face with group members.
+                </p>
+
+            </article>
+
+<!-- ========================================
+     8. VOICE CALL
+======================================== -->
+
+<article class="group-card">
+
+    <h2>
+        Voice Call
+    </h2>
+
+    <p class="group-description">
+        Talk with your group members in real time
+        without turning on your camera.
+    </p>
+
+</article>
+
+        </section>
+
+    </main>
+
+</body>
+
+</html>

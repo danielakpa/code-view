@@ -1,79 +1,272 @@
-
 {% load static %}
 
 <!DOCTYPE html>
 <html lang="en">
 
 <head>
+    <!-- ========================================
+         1. PAGE SETTINGS
+    ========================================= -->
+
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
 
     <title>{{ group.name }} | CodeView</title>
 
-    <!-- Reuse the Project Groups stylesheet. -->
+    <!-- Existing group stylesheet. -->
     <link
         rel="stylesheet"
         href="{% static 'community/groups.css' %}"
     >
+
+    <!-- ========================================
+         2. DISCUSSION BUTTON STYLES
+    ========================================= -->
+
+    <style>
+
+        /* Container for Like, Comment, and Hide buttons. */
+        .discussion-actions {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-top: 18px;
+        }
+
+        /* Remove unwanted spacing around button forms. */
+        .discussion-actions form {
+            margin: 0;
+        }
+
+        /* Default Like button appearance. */
+        .like-button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 11px 18px;
+            background: #ffffff;
+            color: #374151;
+            border: 1px solid #d1d5db;
+            border-radius: 9px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s, color 0.2s;
+        }
+
+        /* Green appearance when the developer likes a post. */
+        .like-button.liked {
+            background: #16a34a;
+            color: #ffffff;
+            border-color: #16a34a;
+        }
+
+        /* Slightly darker green when hovering. */
+        .like-button.liked:hover {
+            background: #15803d;
+        }
+
+        /* Prevent repeated clicks while saving a like. */
+        .like-button:disabled {
+            opacity: 0.7;
+            cursor: wait;
+        }
+
+        /* Comment button appearance. */
+        .comment-button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 11px 18px;
+            background: #f3f4f6;
+            color: #111827;
+            border: 1px solid #d1d5db;
+            border-radius: 9px;
+            font-size: 14px;
+            font-weight: 600;
+            text-decoration: none;
+            cursor: pointer;
+        }
+
+        .comment-button:hover {
+            background: #e5e7eb;
+        }
+
+        /* Hide discussion button. */
+        .hide-button {
+            padding: 11px 18px;
+            background: #ffffff;
+            color: #6b7280;
+            border: 1px solid #d1d5db;
+            border-radius: 9px;
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        .hide-button:hover {
+            background: #fef2f2;
+            color: #b91c1c;
+        }
+
+        /* Discussion statistics. */
+        .discussion-stats {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+            margin-top: 12px;
+            color: #6b7280;
+            font-size: 14px;
+        }
+
+        /* Back navigation button. */
+        .page-back-button {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 16px;
+            margin-bottom: 22px;
+            background: #ffffff;
+            color: #374151;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .page-back-button:hover {
+            background: #f3f4f6;
+        }
+
+        /* Small error message for failed Like requests. */
+        .like-error {
+            color: #b91c1c;
+            font-size: 13px;
+        }
+
+    </style>
+
 </head>
 
 <body>
 
     <!-- ========================================
-         TOP NAVIGATION
+         3. TOP NAVIGATION
     ========================================= -->
 
-   <!-- ========================================
-     CODEVIEW GROUPS NAVIGATION
-======================================== -->
+    <header class="navbar">
 
-<header class="navbar">
-
-    <!-- Clicking the logo opens the Groups Dashboard. -->
-    <a href="{% url 'groups' %}" class="brand">
-        &lt;/&gt; CodeView
-    </a>
-
-    <!-- Group navigation. -->
-    <nav class="top-links">
-
-        <a href="{% url 'groups' %}" class="active">
-            Groups
+        <a href="{% url 'groups' %}" class="brand">
+            &lt;/&gt; CodeView
         </a>
 
-        <a href="{% url 'create_group' %}">
-            Create Group
-        </a>
+        <nav class="top-links">
 
-    </nav>
+            <a href="{% url 'groups' %}" class="active">
+                Groups
+            </a>
 
-    <!-- Logged-in developer profile. -->
-    <div class="profile">
+            <a href="{% url 'create_group' %}">
+                Create Group
+            </a>
 
-        <span class="avatar">
-            {{ request.user.username|first|upper }}
-        </span>
+        </nav>
 
-        <span>
-            {{ request.user.username }}
-        </span>
+        <div class="profile">
 
-    </div>
+            <span class="avatar">
+                {{ request.user.username|first|upper }}
+            </span>
 
-</header>
+            <span>
+                {{ request.user.username }}
+            </span>
+
+        </div>
+
+    </header>
+
 
     <!-- ========================================
-         GROUP WORKSPACE
+         4. GROUP WORKSPACE
     ========================================= -->
 
     <main class="page-container">
 
-        <!-- Back navigation. -->
-        <a href="{% url 'groups' %}" class="back-link">
-            ← Back to Groups
-        </a>
+        <!-- ========================================
+             5. DJANGO NOTIFICATIONS
+        ========================================= -->
 
-        <!-- Group information. -->
+        {% if messages %}
+
+            <section
+                class="notifications"
+                aria-live="polite"
+            >
+
+                {% for message in messages %}
+
+                    <div
+                        class="notification notification-{{ message.tags }}"
+                        role="status"
+                    >
+
+                        {% if "success" in message.tags %}
+
+                            <span aria-hidden="true">✅</span>
+
+                        {% elif "error" in message.tags %}
+
+                            <span aria-hidden="true">❌</span>
+
+                        {% else %}
+
+                            <span aria-hidden="true">ℹ️</span>
+
+                        {% endif %}
+
+                        <span>
+                            {{ message }}
+                        </span>
+
+                    </div>
+
+                {% endfor %}
+
+            </section>
+
+        {% endif %}
+
+
+        <!-- ========================================
+             6. BACK NAVIGATION
+        ========================================= -->
+
+        <!--
+            Return to the previous page when possible.
+
+            The fallback goes to the Groups dashboard.
+        -->
+
+        <button
+            type="button"
+            class="page-back-button"
+            onclick="goBack()"
+        >
+            ← Back
+        </button>
+
+
+        <!-- ========================================
+             7. GROUP INFORMATION
+        ========================================= -->
+
         <section class="group-workspace-header">
 
             <div>
@@ -83,126 +276,735 @@
                 {% if group.is_private %}
 
                     <span class="privacy-badge private">
-                        Private Group
+                        Private Development Group
                     </span>
 
                 {% else %}
 
                     <span class="privacy-badge public">
-                        Public Group
+                        Public Community
                     </span>
 
                 {% endif %}
 
-                <!-- Description is visible only inside the group. -->
+                <p class="group-owner">
+
+                    <strong>Joining Policy:</strong>
+
+                    {{ group.get_join_policy_display }}
+
+                </p>
+
                 <p class="workspace-description">
                     {{ group.description|linebreaksbr }}
                 </p>
 
                 <p class="group-owner">
-                    Created by @{{ group.owner.username }}
+                    Created by {{ group.owner.username }}
                 </p>
 
             </div>
 
         </section>
 
+
         <!-- ========================================
-             GROUP FEATURES
+             8. MEMBERSHIP ACTIONS
         ========================================= -->
 
-        <section class="workspace-grid">
+        {% if not is_member %}
 
-            <article class="group-card">
+            <section class="members-section">
 
-                <h2>Group Discussions</h2>
+                <h2>Join This Community</h2>
 
-                <p class="group-description">
-                    Share project updates, ask questions,
-                    and discuss ideas with your team.
-                </p>
+                {% if pending_request %}
 
-                <span class="coming-soon">
-                    Coming next
-                </span>
+                    <p class="group-description">
+                        Your membership request has been
+                        submitted successfully.
+                    </p>
 
-            </article>
+                    <p class="group-description">
+                        Please wait for a group administrator
+                        to review your request.
+                    </p>
 
-            <article class="group-card">
+                    <span class="coming-soon">
+                        ⏳ Request Pending
+                    </span>
 
-                <h2>Code Board</h2>
+                {% elif group.join_policy == "invite" %}
 
-                <p class="group-description">
-                    Collaborate on code with one active editor
-                    and a queue for other developers.
-                </p>
+                    <p class="group-description">
+                        This group is invitation-only.
+                        Contact a group administrator
+                        to request an invitation.
+                    </p>
 
-                <span class="coming-soon">
-                    Coming next
-                </span>
+                {% elif group.join_policy == "approval" %}
 
-            </article>
+                    <p class="group-description">
+                        An administrator must approve your
+                        membership request before you can participate.
+                    </p>
 
-            <article class="group-card">
+                    <form
+                        method="POST"
+                        action="{% url 'join_group' group.id %}"
+                    >
 
-                <h2>Group Meetings</h2>
+                        {% csrf_token %}
 
-                <p class="group-description">
-                    Organize meetings and collaborate
-                    with other group members.
-                </p>
+                        <div class="form-field">
 
-                <span class="coming-soon">
-                    Planned feature
-                </span>
+                            <label for="join-message">
+                                Why would you like to join?
+                            </label>
 
-            </article>
+                            <textarea
+                                id="join-message"
+                                name="message"
+                                class="group-textarea"
+                                maxlength="1000"
+                                rows="4"
+                                placeholder="Introduce yourself (optional)"
+                            ></textarea>
 
-        </section>
+                        </div>
+
+                        <button
+                            type="submit"
+                            class="group-action"
+                        >
+                            Request to Join
+                        </button>
+
+                    </form>
+
+                {% elif group.join_policy == "open" %}
+
+                    <p class="group-description">
+                        This community is open to everyone.
+                    </p>
+
+                    <form
+                        method="POST"
+                        action="{% url 'join_group' group.id %}"
+                    >
+
+                        {% csrf_token %}
+
+                        <button
+                            type="submit"
+                            class="group-action"
+                        >
+                            Join Community
+                        </button>
+
+                    </form>
+
+                {% endif %}
+
+            </section>
+
+        {% endif %}
+
 
         <!-- ========================================
-             GROUP MEMBERS
+             9. ADMINISTRATOR CONTROLS
+        ========================================= -->
+
+        {% if is_admin %}
+
+            <section class="members-section">
+
+                <h2>Group Administration</h2>
+
+                <p class="group-description">
+                    Review developers requesting access
+                    to this group.
+                </p>
+
+                <a
+                    href="{% url 'membership_requests' group.id %}"
+                    class="group-action"
+                >
+                    Manage Membership Requests
+                </a>
+
+            </section>
+
+        {% endif %}
+
+
+        <!-- ========================================
+             10. GROUP FEATURES
+        ========================================= -->
+
+        {% if is_member %}
+
+            <section class="workspace-grid">
+
+                <!-- Group discussions. -->
+                <article class="group-card">
+
+                    <h2>Group Discussions</h2>
+
+                    <p class="group-description">
+                        Share ideas, ask questions, and
+                        collaborate through discussion posts.
+                    </p>
+
+                    <a
+                        href="#group-discussions"
+                        class="group-action"
+                    >
+                        View Discussions
+                    </a>
+
+                </article>
+
+
+                <!-- Group chat. -->
+                <article class="group-card">
+
+                    <h2>Group Chat</h2>
+
+                    <p class="group-description">
+                        Chat with members, share code snippets,
+                        reply to messages, and exchange files.
+                    </p>
+
+                    <a
+                        href="{% url 'group_chat' group.id %}"
+                        class="group-action"
+                    >
+                        Open Group Chat
+                    </a>
+
+                </article>
+
+
+                <!-- Private development features. -->
+                {% if group.is_private %}
+
+                    <article class="group-card">
+
+                        <h2>Development Workspace</h2>
+
+                        <p class="group-description">
+                            Write and review code with
+                            your development team.
+                        </p>
+
+                        <a
+                            href="{% url 'code_board' group.id %}"
+                            class="group-action"
+                        >
+                            Open Code Board
+                        </a>
+
+                    </article>
+
+
+                    <article class="group-card">
+
+                        <h2>Meeting Room</h2>
+
+                        <p class="group-description">
+                            Collaborate with your team
+                            through video and voice meetings.
+                        </p>
+
+                        <a
+                            href="{% url 'meeting_room' group.id %}"
+                            class="group-action"
+                        >
+                            Enter Meeting Room
+                        </a>
+
+                    </article>
+
+                {% endif %}
+
+            </section>
+
+        {% endif %}
+
+
+        <!-- ========================================
+             11. CREATE DISCUSSION
+        ========================================= -->
+
+        {% if is_member %}
+
+            <section
+                id="group-discussions"
+                class="members-section"
+            >
+
+                <h2>Create a Discussion</h2>
+
+                <p class="group-description">
+                    Ask a question, share an idea,
+                    or start a conversation with your group.
+                </p>
+
+                <form
+                    method="POST"
+                    action="{% url 'create_discussion' group.id %}"
+                >
+
+                    {% csrf_token %}
+
+                    <div class="form-field">
+
+                        <label for="discussion-title">
+                            Discussion Title
+                        </label>
+
+                        <input
+                            type="text"
+                            id="discussion-title"
+                            name="title"
+                            class="group-input"
+                            maxlength="200"
+                            placeholder="What would you like to discuss?"
+                            required
+                        >
+
+                    </div>
+
+
+                    <div class="form-field">
+
+                        <label for="discussion-content">
+                            Your Message
+                        </label>
+
+                        <textarea
+                            id="discussion-content"
+                            name="content"
+                            class="group-textarea"
+                            rows="5"
+                            placeholder="Share your thoughts or ask a question..."
+                            required
+                        ></textarea>
+
+                    </div>
+
+                    <button
+                        type="submit"
+                        class="group-action"
+                    >
+                        Publish Discussion
+                    </button>
+
+                </form>
+
+            </section>
+
+        {% endif %}
+
+
+        <!-- ========================================
+             12. DISCUSSION FEED
         ========================================= -->
 
         <section class="members-section">
 
-            <h2>Group Members ({{ members|length }})</h2>
+            <h2>Recent Discussions</h2>
 
-            <div class="members-list">
+            {% for discussion in discussions %}
 
-                {% for membership in members %}
+                <article
+                    class="group-card"
+                    id="discussion-{{ discussion.id }}"
+                >
 
-                    <div class="member-item">
+                    <!-- Discussion author and date. -->
+                    <p class="group-owner">
 
-                        <span class="avatar">
-                            {{ membership.user.username|first|upper }}
+                        <strong>
+                            {{ discussion.author.username }}
+                        </strong>
+
+                        ·
+
+                        {{ discussion.created_at|date:"M d, Y - H:i" }}
+
+                    </p>
+
+
+                    <!-- Discussion title. -->
+                    <h3>
+                        {{ discussion.title }}
+                    </h3>
+
+
+                    <!-- Discussion preview. -->
+                    <p class="group-description">
+                        {{ discussion.content|truncatewords:50|linebreaksbr }}
+                    </p>
+
+
+                    <!-- ====================================
+                         LIKE AND COMMENT COUNTS
+                    ==================================== -->
+
+                    <div class="discussion-stats">
+
+                        <span>
+                            💚
+                            <span
+                                id="like-count-{{ discussion.id }}"
+                            >
+                                {{ discussion.like_count }}
+                            </span>
+                            likes
                         </span>
 
-                        <div>
-
-                            <strong>
-                                @{{ membership.user.username }}
-                            </strong>
-
-                            <small>
-                                {% if membership.user_id == group.owner_id %}
-                                    Owner
-                                {% else %}
-                                    {{ membership.get_role_display }}
-                                {% endif %}
-                            </small>
-
-                        </div>
+                        <span>
+                            💬 {{ discussion.comment_count }} comments
+                        </span>
 
                     </div>
 
-                {% endfor %}
 
-            </div>
+                    <!-- ====================================
+                         DISCUSSION ACTION BUTTONS
+                    ==================================== -->
+
+                    <div class="discussion-actions">
+
+                        {% if is_member %}
+
+                            <!--
+                                The Like form submits using JavaScript.
+
+                                Django returns:
+                                {
+                                    "liked": true,
+                                    "like_count": 12
+                                }
+
+                                JavaScript updates the button and count.
+                            -->
+
+                            <form
+                                method="POST"
+                                action="{% url 'toggle_discussion_like' group.id discussion.id %}"
+                                class="like-form"
+                                data-discussion-id="{{ discussion.id }}"
+                            >
+
+                                {% csrf_token %}
+
+                                <button
+                                    type="submit"
+                                    class="like-button {% if discussion.liked_by_user %}liked{% endif %}"
+                                    aria-pressed="{% if discussion.liked_by_user %}true{% else %}false{% endif %}"
+                                >
+
+                                    <span class="like-label">
+
+                                        {% if discussion.liked_by_user %}
+                                            💚 Liked
+                                        {% else %}
+                                            ♡ Like
+                                        {% endif %}
+
+                                    </span>
+
+                                </button>
+
+                            </form>
+
+                        {% endif %}
+
+
+                        <!--
+                            Clicking Comment opens the full discussion.
+
+                            Developers can comment and reply there.
+                        -->
+
+                        <a
+                            href="{% url 'discussion_detail' group.id discussion.id %}"
+                            class="comment-button"
+                        >
+                            💬 Comment
+                        </a>
+
+
+                        {% if is_member %}
+
+                            <!-- Hide this post from the user's feed. -->
+                            <form
+                                method="POST"
+                                action="{% url 'hide_discussion' group.id discussion.id %}"
+                            >
+
+                                {% csrf_token %}
+
+                                <button
+                                    type="submit"
+                                    class="hide-button"
+                                >
+                                    Hide Post
+                                </button>
+
+                            </form>
+
+                        {% endif %}
+
+                    </div>
+
+                    <!-- Display an error if the Like request fails. -->
+                    <p
+                        class="like-error"
+                        id="like-error-{{ discussion.id }}"
+                        role="alert"
+                        hidden
+                    ></p>
+
+                </article>
+
+            {% empty %}
+
+                <p class="group-description">
+                    No discussions have been published yet.
+                </p>
+
+                {% if is_member %}
+
+                    <p class="group-description">
+                        Be the first to start a conversation!
+                    </p>
+
+                {% endif %}
+
+            {% endfor %}
 
         </section>
 
+
+        <!-- ========================================
+             13. GROUP MEMBERS
+        ========================================= -->
+
+        {% if is_member %}
+
+            <section class="members-section">
+
+                <h2>
+                    Group Members ({{ members|length }})
+                </h2>
+
+                <div class="members-list">
+
+                    {% for membership in members %}
+
+                        <div class="member-item">
+
+                            <span class="avatar">
+                                {{ membership.user.username|first|upper }}
+                            </span>
+
+                            <div>
+
+                                <strong>
+                                    {{ membership.user.username }}
+                                </strong>
+
+                                <small>
+
+                                    {% if membership.user_id == group.owner_id %}
+
+                                        Owner
+
+                                    {% else %}
+
+                                        {{ membership.get_role_display }}
+
+                                    {% endif %}
+
+                                </small>
+
+                            </div>
+
+                        </div>
+
+                    {% empty %}
+
+                        <p>No members yet.</p>
+
+                    {% endfor %}
+
+                </div>
+
+            </section>
+
+        {% endif %}
+
     </main>
+
+
+    <!-- ========================================
+         14. JAVASCRIPT
+    ========================================= -->
+
+    <script>
+
+        // ============================================
+        // A. BACK BUTTON
+        // ============================================
+
+        function goBack() {
+
+            // Check whether the previous page belongs
+            // to the same website.
+            let previousPage = document.referrer;
+
+            if (previousPage) {
+
+                try {
+
+                    let previousURL = new URL(previousPage);
+
+                    if (
+                        previousURL.origin === window.location.origin
+                        && previousURL.pathname !== window.location.pathname
+                    ) {
+
+                        window.history.back();
+                        return;
+
+                    }
+
+                } catch (error) {
+
+                    // If the previous URL is invalid,
+                    // use the fallback below.
+
+                }
+
+            }
+
+            // Safe fallback to the Groups dashboard.
+            window.location.href = "{% url 'groups' %}";
+
+        }
+
+
+        // ============================================
+        // B. LIKE BUTTONS
+        // ============================================
+
+        // Find every Like form displayed in the feed.
+        const likeForms = document.querySelectorAll(".like-form");
+
+        // Attach a submit handler to each form.
+        likeForms.forEach(function(form) {
+
+            form.addEventListener("submit", async function(event) {
+
+                // Stop the browser from reloading the page.
+                event.preventDefault();
+
+                // Identify this discussion.
+                const discussionId = form.dataset.discussionId;
+
+                // Find the button and its label.
+                const button = form.querySelector(".like-button");
+
+                const label = button.querySelector(".like-label");
+
+                // Find the displayed like count.
+                const countElement = document.getElementById(
+                    "like-count-" + discussionId
+                );
+
+                // Find the error message container.
+                const errorElement = document.getElementById(
+                    "like-error-" + discussionId
+                );
+
+                // Clear any previous error.
+                errorElement.hidden = true;
+                errorElement.textContent = "";
+
+                // Disable the button while Django saves the like.
+                button.disabled = true;
+
+                try {
+
+                    // Send the existing form data, including CSRF.
+                    const response = await fetch(form.action, {
+
+                        method: "POST",
+
+                        body: new FormData(form),
+
+                        headers: {
+                            "X-Requested-With": "XMLHttpRequest"
+                        },
+
+                        credentials: "same-origin"
+
+                    });
+
+                    // Stop if Django rejected the request.
+                    if (!response.ok) {
+
+                        throw new Error(
+                            "Unable to update your like. Please try again."
+                        );
+
+                    }
+
+                    // Read Django's JSON response.
+                    const data = await response.json();
+
+                    // Update the button using the saved database state.
+                    if (data.liked) {
+
+                        button.classList.add("liked");
+                        button.setAttribute("aria-pressed", "true");
+
+                        label.textContent = "💚 Liked";
+
+                    } else {
+
+                        button.classList.remove("liked");
+                        button.setAttribute("aria-pressed", "false");
+
+                        label.textContent = "♡ Like";
+
+                    }
+
+                    // Update the visible number of likes.
+                    countElement.textContent = data.like_count;
+
+                } catch (error) {
+
+                    // Show a message without changing the button state.
+                    errorElement.textContent = error.message;
+                    errorElement.hidden = false;
+
+                } finally {
+
+                    // Allow the developer to click again.
+                    button.disabled = false;
+
+                }
+
+            });
+
+        });
+
+    </script>
 
 </body>
 

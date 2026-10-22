@@ -1,94 +1,117 @@
-
 {% load static %}
 
 <!DOCTYPE html>
 <html lang="en">
 
 <head>
+    <!-- ========================================
+         1. PAGE SETTINGS
+    ========================================= -->
+
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
 
     <title>Create Group | CodeView</title>
 
-    <!-- Use the same stylesheet as the Groups page. -->
+    <!-- Load the existing Groups stylesheet. -->
     <link
         rel="stylesheet"
         href="{% static 'community/groups.css' %}"
     >
+
 </head>
 
 <body>
 
     <!-- ========================================
-         1. TOP NAVIGATION
+         2. TOP NAVIGATION
     ========================================= -->
 
-   <!-- ========================================
-     CODEVIEW GROUPS NAVIGATION
-======================================== -->
+    <header class="navbar">
 
-<header class="navbar">
-
-    <!-- Clicking the logo opens the Groups Dashboard. -->
-    <a href="{% url 'groups' %}" class="brand">
-        &lt;/&gt; CodeView
-    </a>
-
-    <!-- Group navigation. -->
-    <nav class="top-links">
-
-        <a href="{% url 'groups' %}" class="active">
-            Groups
+        <!-- CodeView logo. -->
+        <a href="{% url 'groups' %}" class="brand">
+            &lt;/&gt; CodeView
         </a>
 
-        <a href="{% url 'create_group' %}">
-            Create Group
-        </a>
+        <!-- Navigation links. -->
+        <nav class="top-links">
 
-    </nav>
+            <a href="{% url 'groups' %}">
+                Groups
+            </a>
 
-    <!-- Logged-in developer profile. -->
-    <div class="profile">
+            <a
+                href="{% url 'create_group' %}"
+                class="active"
+                aria-current="page"
+            >
+                Create Group
+            </a>
 
-        <span class="avatar">
-            {{ request.user.username|first|upper }}
-        </span>
+        </nav>
 
-        <span>
-            {{ request.user.username }}
-        </span>
+        <!-- Logged-in developer profile. -->
+        <div class="profile">
 
-    </div>
+            <span class="avatar">
+                {{ request.user.username|first|upper }}
+            </span>
 
-</header>
+            <span>
+                {{ request.user.username }}
+            </span>
+
+        </div>
+
+    </header>
+
 
     <!-- ========================================
-         2. CREATE GROUP FORM
+         3. CREATE GROUP FORM
     ========================================= -->
 
     <main class="form-page">
 
         <section class="form-card">
 
+            <!-- Back navigation. -->
             <a href="{% url 'groups' %}" class="back-link">
                 ← Back to Groups
             </a>
 
-            <h1>Create a Project Group</h1>
+            <h1>Create a CodeView Group</h1>
 
             <p class="form-intro">
-                Start a group where developers can collaborate
-                on a project.
+                Create a public community for discussions
+                or a private development group for team collaboration.
             </p>
 
-            <form method="POST" action="{% url 'create_group' %}">
 
+            <!-- ========================================
+                 4. FORM
+            ========================================= -->
+
+            <form
+                method="POST"
+                action="{% url 'create_group' %}"
+            >
+
+                <!-- Protect against cross-site request forgery. -->
                 {% csrf_token %}
 
-                <!-- Display general form errors. -->
+                <!-- General validation errors. -->
                 {{ form.non_field_errors }}
 
-                <!-- Group name. -->
+
+                <!-- ========================================
+                     5. GROUP NAME
+                ========================================= -->
+
                 <div class="form-field">
 
                     <label for="{{ form.name.id_for_label }}">
@@ -101,7 +124,11 @@
 
                 </div>
 
-                <!-- Group description. -->
+
+                <!-- ========================================
+                     6. GROUP DESCRIPTION
+                ========================================= -->
+
                 <div class="form-field">
 
                     <label for="{{ form.description.id_for_label }}">
@@ -114,7 +141,11 @@
 
                 </div>
 
-                <!-- Group privacy setting. -->
+
+                <!-- ========================================
+                     7. GROUP TYPE
+                ========================================= -->
+
                 <div class="privacy-option">
 
                     {{ form.is_private }}
@@ -122,12 +153,23 @@
                     <div>
 
                         <label for="{{ form.is_private.id_for_label }}">
-                            Make this group private
+                            Private Development Group
                         </label>
 
                         <p>
-                            Private groups are only visible to members.
-                            Public groups can be discovered by developers.
+                            Leave unchecked to create a public community.
+                            Public communities can be discovered by developers.
+                        </p>
+
+                        <p>
+                            Check this option to create a private development
+                            group with coding tools, GitHub collaboration,
+                            and meeting features.
+                        </p>
+
+                        <p>
+                            Private development groups support a maximum
+                            of 10 members, including the creator.
                         </p>
 
                     </div>
@@ -136,7 +178,51 @@
 
                 {{ form.is_private.errors }}
 
-                <!-- Form buttons. -->
+
+                <!-- ========================================
+                     8. JOINING POLICY
+                ========================================= -->
+
+                <div class="form-field">
+
+                    <label for="{{ form.join_policy.id_for_label }}">
+                        Who Can Join?
+                    </label>
+
+                    <!-- Dropdown from ProjectGroupForm. -->
+                    {{ form.join_policy }}
+
+                    <!-- Show validation errors beside this field. -->
+                    {{ form.join_policy.errors }}
+
+                    <p class="group-description">
+                        <strong>Anyone Can Join:</strong>
+                        Developers become members immediately.
+                    </p>
+
+                    <p class="group-description">
+                        <strong>Admin Approval Required:</strong>
+                        Developers send a request, and an administrator
+                        must approve it before they can participate.
+                    </p>
+
+                    <p class="group-description">
+                        <strong>Invitation Only:</strong>
+                        Only invited developers can become members.
+                    </p>
+
+                    <p class="group-description">
+                        Private development groups must use
+                        Admin Approval Required or Invitation Only.
+                    </p>
+
+                </div>
+
+
+                <!-- ========================================
+                     9. FORM BUTTONS
+                ========================================= -->
+
                 <div class="form-actions">
 
                     <a
@@ -146,7 +232,10 @@
                         Cancel
                     </a>
 
-                    <button type="submit" class="primary-button">
+                    <button
+                        type="submit"
+                        class="primary-button"
+                    >
                         Create Group
                     </button>
 

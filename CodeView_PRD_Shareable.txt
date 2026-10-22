@@ -1,0 +1,69 @@
+CODEVIEW
+PRODUCT REQUIREMENTS DOCUMENT (PRD)
+Version 1.2 | October 2026
+
+1. EXECUTIVE SUMMARY
+CodeView is a web-based platform that combines developer communities,
+team collaboration, and a browser-based software development workspace.
+It is designed for students, universities, coding communities, and teams.
+
+2. PRODUCT OBJECTIVES
+Provide moderated communities for learning and sharing knowledge.
+Enable small teams to develop, review, and collaborate on real projects.
+
+3. USERS AND GROUP ACCESS
+Users register, sign in, create profiles, and discover communities.
+Public Communities support open membership or administrator approval.
+Private Development Groups require invitation or administrator approval.
+Private Development Groups allow up to 10 members, including the owner.
+Administrators manage membership requests, roles, and moderation.
+
+4. PUBLIC COMMUNITY REQUIREMENTS
+Members can publish, edit, and delete their own posts and discussions.
+Members can like, comment, share, and hide posts from their own feeds.
+Communities support real-time chat, replies, voice notes, and file sharing.
+Administrators can moderate content and manage community membership.
+
+5. PRIVATE DEVELOPMENT WORKSPACE
+Connect authorized GitHub repositories and manage developer branches.
+Browse and edit project files using a VS Code-style Monaco editor.
+Support Python, JavaScript, TypeScript, Go, Java, C++, C#, PHP, HTML,
+CSS, and SQL; provide a terminal, isolated execution, and live previews.
+Enable team tasks, code presentation, review, and pull-request workflows.
+Include real-time chat, replies, voice notes, and shared project files.
+Support voice/video calls with one active meeting per group,
+limited to 10 authorized participants, alongside coding activities.
+
+6. AI ASSISTANCE
+Allow users to choose OpenAI, Claude, Gemini, or DeepSeek integrations.
+Provide requested code explanation, debugging, and test generation.
+Require explicit review before inserting suggested code changes.
+Do not provide automatic AI code completion while users type.
+Use supported provider APIs or authorization; protect credentials.
+
+7. TECHNOLOGY AND ARCHITECTURE
+Backend: Python and Django; primary database: PostgreSQL.
+Frontend: HTML, CSS, JavaScript, and Monaco Editor.
+Real-time services: WebSockets/Django Channels, supported by Redis.
+Video: WebRTC with a scalable SFU or managed media service.
+Use background workers, object storage, and isolated code runners.
+
+8. SECURITY AND QUALITY
+Apply authentication, role-based permissions, and group access controls.
+Protect private code, conversations, and repository credentials.
+Use transactional membership checks, input validation, and rate limits.
+Isolate untrusted code; implement backups, logging, and monitoring.
+Test functionality, security, concurrency, and performance before release.
+
+9. CAPACITY AND GROWTH TARGETS
+Long-term target: 1,000,000 registered and 100,000 concurrent users.
+Planning scenario: 20,000 coding, 5,000 using AI, 2,000 in video calls.
+Initial load-test goal: 500 online, 100 coding, 25 AI, and 20 video.
+Capacity figures are goals to validate through real performance tests.
+Scale by adding app servers, load balancing, caching, and specialized services.
+
+10. DELIVERY APPROACH
+Implement complete features in stages with maintainable, modular code.
+Design for future infrastructure growth without major architectural rewrites.
+Develop locally with open-source tools; production infrastructure,
+AI usage, video bandwidth, and code execution will incur operating costs.

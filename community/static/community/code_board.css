@@ -1,0 +1,217 @@
+/* ============================================================
+   1. CODE BOARD PAGE
+============================================================ */
+
+.code-board-container {
+    width: min(1200px, 94%);
+    margin: 35px auto;
+}
+
+
+/* ============================================================
+   2. CODE BOARD HEADER
+============================================================ */
+
+.code-board-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 20px;
+
+    margin: 25px 0;
+}
+
+.code-board-header h1 {
+    margin-bottom: 8px;
+}
+
+.code-board-header p {
+    color: #94a3b8;
+}
+
+.last-editor {
+    color: #94a3b8;
+    font-size: 14px;
+}
+
+.last-editor strong {
+    color: #22c55e;
+}
+
+
+/* ============================================================
+   3. EDITOR FORM
+============================================================ */
+
+.code-editor-form {
+    background-color: #111827;
+    border: 1px solid #334155;
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+
+/* ============================================================
+   4. EDITOR TOOLBAR
+============================================================ */
+
+.editor-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+
+    padding: 20px;
+    border-bottom: 1px solid #334155;
+}
+
+.toolbar-field {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+
+    flex: 1;
+    min-width: 180px;
+}
+
+.toolbar-field label {
+    font-size: 13px;
+    color: #cbd5e1;
+}
+
+.toolbar-field input,
+.toolbar-field select {
+    padding: 12px;
+
+    background-color: #020617;
+    color: #f8fafc;
+
+    border: 1px solid #334155;
+    border-radius: 8px;
+
+    font-size: 14px;
+}
+
+
+/* ============================================================
+   5. CODE EDITOR
+============================================================ */
+
+.editor-container {
+    background-color: #020617;
+}
+
+.editor-topbar {
+    display: flex;
+    justify-content: space-between;
+
+    padding: 12px 20px;
+
+    background-color: #1e293b;
+    border-bottom: 1px solid #334155;
+}
+
+.editor-filename {
+    color: #f8fafc;
+    font-size: 14px;
+}
+
+.editor-language {
+    color: #22c55e;
+    font-size: 13px;
+}
+
+.code-editor {
+    display: block;
+    width: 100%;
+    min-height: 450px;
+    box-sizing: border-box;
+
+    padding: 24px;
+
+    background-color: #020617;
+    color: #e2e8f0;
+
+    border: none;
+    outline: none;
+    resize: vertical;
+
+    font-family: "Courier New", monospace;
+    font-size: 15px;
+    line-height: 1.7;
+
+    tab-size: 4;
+}
+
+
+/* ============================================================
+   6. SAVE BUTTON
+============================================================ */
+
+.editor-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 15px;
+    flex-wrap: wrap;
+
+    padding: 20px;
+
+    border-top: 1px solid #334155;
+}
+
+.save-info {
+    color: #94a3b8;
+    font-size: 13px;
+}
+
+.save-code-btn {
+    padding: 12px 24px;
+
+    background-color: #22c55e;
+    color: #052e16;
+
+    border: none;
+    border-radius: 8px;
+
+    font-size: 14px;
+    font-weight: 700;
+
+    cursor: pointer;
+}
+
+.save-code-btn:hover {
+    background-color: #16a34a;
+}
+
+
+/* ============================================================
+   7. MOBILE RESPONSIVENESS
+============================================================ */
+
+@media (max-width: 600px) {
+
+    .code-board-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .editor-toolbar {
+        flex-direction: column;
+    }
+
+    .editor-actions {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .save-code-btn {
+        width: 100%;
+    }
+
+    .code-editor {
+        min-height: 350px;
+        padding: 15px;
+        font-size: 13px;
+    }
+
+}

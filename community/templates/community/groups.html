@@ -1,74 +1,123 @@
-
 {% load static %}
 
 <!DOCTYPE html>
 <html lang="en">
 
 <head>
+    <!-- ========================================
+         1. PAGE SETTINGS
+    ========================================= -->
+
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
 
     <title>Project Groups | CodeView</title>
 
-    <!-- Load the Project Groups stylesheet. -->
+    <!-- Load existing stylesheet. -->
     <link
         rel="stylesheet"
         href="{% static 'community/groups.css' %}"
     >
+
 </head>
 
 <body>
 
     <!-- ========================================
-         1. TOP NAVIGATION
+         2. TOP NAVIGATION
     ========================================= -->
 
-<!-- ========================================
-     CODEVIEW GROUPS NAVIGATION
-======================================== -->
+    <header class="navbar">
 
-<header class="navbar">
-
-    <!-- Clicking the logo opens the Groups Dashboard. -->
-    <a href="{% url 'groups' %}" class="brand">
-        &lt;/&gt; CodeView
-    </a>
-
-    <!-- Group navigation. -->
-    <nav class="top-links">
-
-        <a href="{% url 'groups' %}" class="active">
-            Groups
+        <a href="{% url 'groups' %}" class="brand">
+            &lt;/&gt; CodeView
         </a>
 
-        <a href="{% url 'create_group' %}">
-            Create Group
-        </a>
+        <nav class="top-links">
 
-    </nav>
+            <a
+                href="{% url 'groups' %}"
+                class="active"
+                aria-current="page"
+            >
+                Groups
+            </a>
 
-    <!-- Logged-in developer profile. -->
-    <div class="profile">
+            <a href="{% url 'create_group' %}">
+                Create Group
+            </a>
 
-        <span class="avatar">
-            {{ request.user.username|first|upper }}
-        </span>
+        </nav>
 
-        <span>
-            {{ request.user.username }}
-        </span>
+        <div class="profile">
 
-    </div>
+            <span class="avatar">
+                {{ request.user.username|first|upper }}
+            </span>
 
-</header>
+            <span>
+                {{ request.user.username }}
+            </span>
+
+        </div>
+
+    </header>
+
 
     <!-- ========================================
-         2. MAIN PAGE
+         3. MAIN PAGE
     ========================================= -->
 
     <main class="page-container">
 
-        <!-- Page heading and Create Group button. -->
+        <!-- ========================================
+             4. DJANGO NOTIFICATION MESSAGES
+        ========================================= -->
+
+        {% if messages %}
+
+            <section
+                class="notifications"
+                aria-live="polite"
+            >
+
+                {% for message in messages %}
+
+                    <div
+                        class="notification notification-{{ message.tags }}"
+                        role="status"
+                    >
+
+                        {% if "success" in message.tags %}
+                            <span>✅</span>
+
+                        {% elif "error" in message.tags %}
+                            <span>❌</span>
+
+                        {% else %}
+                            <span>ℹ️</span>
+
+                        {% endif %}
+
+                        <span>{{ message }}</span>
+
+                    </div>
+
+                {% endfor %}
+
+            </section>
+
+        {% endif %}
+
+
+        <!-- ========================================
+             5. PAGE HEADING
+        ========================================= -->
+
         <section class="page-heading">
 
             <div>
@@ -76,7 +125,8 @@
                 <h1>Project Groups</h1>
 
                 <p>
-                    Find developers, join projects, and collaborate.
+                    Find developers, join communities,
+                    and collaborate on projects.
                 </p>
 
             </div>
@@ -90,30 +140,27 @@
 
         </section>
 
+
         <!-- ========================================
-             3. PROJECT GROUP LIST
+             6. PROJECT GROUP LIST
         ========================================= -->
 
         <section class="groups-grid">
 
-            <!-- Loop through all available project groups. -->
             {% for group in groups %}
 
-                <!-- Each group has its own complete card. -->
                 <article class="group-card">
 
                     <!-- ========================================
-                         4. GROUP ICON AND PRIVACY
+                         7. GROUP ICON AND PRIVACY
                     ========================================= -->
 
                     <div class="group-card-top">
 
-                        <!-- Group icon. -->
                         <div class="group-icon">
                             &lt;/&gt;
                         </div>
 
-                        <!-- Display whether the group is public or private. -->
                         {% if group.is_private %}
 
                             <span class="privacy-badge private">
@@ -130,45 +177,59 @@
 
                     </div>
 
+
                     <!-- ========================================
-                         5. GROUP NAME AND OWNER
+                         8. GROUP INFORMATION
                     ========================================= -->
 
                     <div class="group-card-content">
 
-                        <!-- Display the group name. -->
                         <h2 class="group-name">
                             {{ group.name }}
                         </h2>
 
-                        <!-- Display the developer who created the group. -->
                         <p class="group-owner">
                             Created by @{{ group.owner.username }}
                         </p>
 
-                        <!--
-                            The group description is intentionally
-                            not displayed on this listing page.
-                            It is shown inside the group instead.
-                        -->
+                        <p class="group-owner">
+
+                            {% if group.join_policy == "open" %}
+
+                                Anyone Can Join
+
+                            {% elif group.join_policy == "approval" %}
+
+                                Admin Approval Required
+
+                            {% elif group.join_policy == "invite" %}
+
+                                Invitation Only
+
+                            {% endif %}
+
+                        </p>
 
                     </div>
 
+
                     <!-- ========================================
-                         6. GROUP MEMBERSHIP CONTROLS
+                         9. GROUP MEMBERSHIP CONTROLS
                     ========================================= -->
 
                     <div class="group-card-footer">
 
-                        <!-- Display the group creation date. -->
                         <span class="group-date">
                             {{ group.created_at|date:"M d, Y" }}
                         </span>
 
-                        <!-- Check whether the developer is already a member. -->
+
+                        <!-- ====================================
+                             ALREADY A MEMBER
+                        ==================================== -->
+
                         {% if group.is_member %}
 
-                            <!-- Members can enter their group workspace. -->
                             <a
                                 href="{% url 'group_detail' group.id %}"
                                 class="primary-button"
@@ -176,13 +237,32 @@
                                 Enter Group
                             </a>
 
-                        {% elif not group.is_private %}
 
-                            <!-- Nonmembers can join public groups. -->
+                        <!-- ====================================
+                             REQUEST ALREADY PENDING
+                        ==================================== -->
+
+                        {% elif group.has_pending_request %}
+
+                            <span
+                                class="coming-soon"
+                                title="Waiting for administrator approval"
+                            >
+                                ⏳ Request Pending
+                            </span>
+
+
+                        <!-- ====================================
+                             PUBLIC GROUP: OPEN JOINING
+                        ==================================== -->
+
+                        {% elif group.join_policy == "open" and not group.is_private %}
+
                             <form
                                 method="POST"
                                 action="{% url 'join_group' group.id %}"
                             >
+
                                 {% csrf_token %}
 
                                 <button
@@ -194,6 +274,31 @@
 
                             </form>
 
+
+                        <!-- ====================================
+                             PUBLIC GROUP: ADMIN APPROVAL
+                        ==================================== -->
+
+                        {% elif group.join_policy == "approval" and not group.is_private %}
+
+                            <a
+                                href="{% url 'group_detail' group.id %}"
+                                class="primary-button"
+                            >
+                                Request to Join
+                            </a>
+
+
+                        <!-- ====================================
+                             INVITATION-ONLY GROUP
+                        ==================================== -->
+
+                        {% elif group.join_policy == "invite" %}
+
+                            <span class="coming-soon">
+                                Invitation Only
+                            </span>
+
                         {% endif %}
 
                     </div>
@@ -203,7 +308,7 @@
             {% empty %}
 
                 <!-- ========================================
-                     7. EMPTY GROUP LIST
+                     10. EMPTY GROUP LIST
                 ========================================= -->
 
                 <div class="empty-state">

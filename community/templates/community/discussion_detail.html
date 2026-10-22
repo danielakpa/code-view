@@ -1,0 +1,812 @@
+{% load static %}
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <!-- ========================================
+         1. PAGE SETTINGS
+    ========================================= -->
+
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>{{ discussion.title }} | CodeView</title>
+
+    <!-- Reuse the existing group stylesheet. -->
+    <link
+        rel="stylesheet"
+        href="{% static 'community/groups.css' %}"
+    >
+
+    <!-- ========================================
+         2. DISCUSSION PAGE STYLES
+    ========================================= -->
+
+    <style>
+
+        /* Container for discussion action buttons. */
+        .discussion-actions {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-top: 20px;
+        }
+
+        .discussion-actions form {
+            margin: 0;
+        }
+
+        /* Default Like button. */
+        .like-button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 11px 18px;
+            background: #ffffff;
+            color: #374151;
+            border: 1px solid #d1d5db;
+            border-radius: 9px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s, color 0.2s;
+        }
+
+        /* Green button when the discussion is liked. */
+        .like-button.liked {
+            background: #16a34a;
+            color: #ffffff;
+            border-color: #16a34a;
+        }
+
+        .like-button.liked:hover {
+            background: #15803d;
+        }
+
+        /* Prevent repeated clicks while saving. */
+        .like-button:disabled {
+            opacity: 0.7;
+            cursor: wait;
+        }
+
+        /* Comment navigation button. */
+        .comment-button {
+            display: inline-flex;
+            align-items: center;
+            padding: 11px 18px;
+            background: #f3f4f6;
+            color: #111827;
+            border: 1px solid #d1d5db;
+            border-radius: 9px;
+            font-size: 14px;
+            font-weight: 600;
+            text-decoration: none;
+        }
+
+        .comment-button:hover {
+            background: #e5e7eb;
+        }
+
+        /* Hide discussion button. */
+        .hide-button {
+            padding: 11px 18px;
+            background: #ffffff;
+            color: #6b7280;
+            border: 1px solid #d1d5db;
+            border-radius: 9px;
+            cursor: pointer;
+        }
+
+        .hide-button:hover {
+            background: #fef2f2;
+            color: #b91c1c;
+        }
+
+        /* Back navigation button. */
+        .page-back-button {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 16px;
+            margin-bottom: 22px;
+            background: #ffffff;
+            color: #374151;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .page-back-button:hover {
+            background: #f3f4f6;
+        }
+
+        /* Discussion statistics. */
+        .discussion-stats {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+            margin-top: 16px;
+            color: #6b7280;
+            font-size: 14px;
+        }
+
+        /* Individual comment container. */
+        .discussion-comment {
+            margin-bottom: 18px;
+        }
+
+        /* Show when a comment is replying to another comment. */
+        .reply-indicator {
+            color: #16a34a;
+            font-size: 13px;
+            margin-bottom: 8px;
+        }
+
+        /* Error message for failed Like requests. */
+        .like-error {
+            color: #b91c1c;
+            font-size: 13px;
+            margin-top: 10px;
+        }
+
+    </style>
+
+</head>
+
+<body>
+
+    <!-- ========================================
+         3. TOP NAVIGATION
+    ========================================= -->
+
+    <header class="navbar">
+
+        <a href="{% url 'groups' %}" class="brand">
+            &lt;/&gt; CodeView
+        </a>
+
+        <nav class="top-links">
+
+            <a href="{% url 'groups' %}">
+                Groups
+            </a>
+
+            <a
+                href="{% url 'group_detail' group.id %}"
+                class="active"
+            >
+                {{ group.name }}
+            </a>
+
+        </nav>
+
+        <div class="profile">
+
+            <span class="avatar">
+                {{ request.user.username|first|upper }}
+            </span>
+
+            <span>
+                {{ request.user.username }}
+            </span>
+
+        </div>
+
+    </header>
+
+
+    <!-- ========================================
+         4. MAIN CONTENT
+    ========================================= -->
+
+    <main class="page-container">
+
+        <!-- ========================================
+             5. DJANGO NOTIFICATIONS
+        ========================================= -->
+
+        {% if messages %}
+
+            <section
+                class="notifications"
+                aria-live="polite"
+            >
+
+                {% for message in messages %}
+
+                    <div
+                        class="notification notification-{{ message.tags }}"
+                        role="status"
+                    >
+                        {{ message }}
+                    </div>
+
+                {% endfor %}
+
+            </section>
+
+        {% endif %}
+
+
+        <!-- ========================================
+             6. BACK NAVIGATION
+        ========================================= -->
+
+        <!--
+            Return to the previous page when possible.
+
+            If there is no suitable previous page,
+            return to this group's main page.
+        -->
+
+        <button
+            type="button"
+            class="page-back-button"
+            onclick="goBack()"
+        >
+            ← Back
+        </button>
+
+
+        <!-- ========================================
+             7. FULL DISCUSSION POST
+        ========================================= -->
+
+        <section class="members-section">
+
+            <!-- Discussion title. -->
+            <h1>{{ discussion.title }}</h1>
+
+            <!-- Author and publication date. -->
+            <p class="group-owner">
+
+                Posted by
+
+                <strong>
+                    {{ discussion.author.username }}
+                </strong>
+
+                ·
+
+                {{ discussion.created_at|date:"M d, Y - H:i" }}
+
+            </p>
+
+
+            <!-- Full discussion content. -->
+            <p class="workspace-description">
+                {{ discussion.content|linebreaksbr }}
+            </p>
+
+
+            <!-- ====================================
+                 DISCUSSION STATISTICS
+            ==================================== -->
+
+            <div class="discussion-stats">
+
+                <!-- Current number of likes. -->
+                <span>
+                    💚
+
+                    <span id="like-count">
+                        {{ discussion.likes.count }}
+                    </span>
+
+                    likes
+                </span>
+
+                <!-- Current number of comments and replies. -->
+                <span>
+                    💬 {{ comments|length }} comments
+                </span>
+
+            </div>
+
+
+            <!-- ====================================
+                 DISCUSSION ACTION BUTTONS
+            ==================================== -->
+
+            <div class="discussion-actions">
+
+                {% if is_member %}
+
+                    <!--
+                        Like or Unlike without refreshing.
+
+                        The existing Django view returns:
+                        {
+                            "liked": true,
+                            "like_count": 12
+                        }
+                    -->
+
+                    <form
+                        id="like-form"
+                        method="POST"
+                        action="{% url 'toggle_discussion_like' group.id discussion.id %}"
+                    >
+
+                        {% csrf_token %}
+
+                        <button
+                            type="submit"
+                            id="like-button"
+                            class="like-button {% if liked_by_user %}liked{% endif %}"
+                            aria-pressed="{% if liked_by_user %}true{% else %}false{% endif %}"
+                        >
+
+                            <span id="like-label">
+
+                                {% if liked_by_user %}
+                                    💚 Liked
+                                {% else %}
+                                    ♡ Like
+                                {% endif %}
+
+                            </span>
+
+                        </button>
+
+                    </form>
+
+                {% endif %}
+
+
+                <!--
+                    Comment button scrolls to the comment section.
+
+                    This keeps the actual conversation
+                    on the discussion detail page.
+                -->
+
+                <a
+                    href="#comments-section"
+                    class="comment-button"
+                >
+                    💬 Comments
+                </a>
+
+
+                {% if is_member %}
+
+                    <!-- Hide this discussion for the current user. -->
+                    <form
+                        method="POST"
+                        action="{% url 'hide_discussion' group.id discussion.id %}"
+                    >
+
+                        {% csrf_token %}
+
+                        <button
+                            type="submit"
+                            class="hide-button"
+                        >
+                            Hide Discussion
+                        </button>
+
+                    </form>
+
+                {% endif %}
+
+            </div>
+
+
+            <!-- Display errors if a Like request fails. -->
+            <p
+                id="like-error"
+                class="like-error"
+                role="alert"
+                hidden
+            ></p>
+
+        </section>
+
+
+        <!-- ========================================
+             8. ADD A COMMENT
+        ========================================= -->
+
+        {% if is_member %}
+
+            <section
+                id="comments-section"
+                class="members-section"
+            >
+
+                <h2>Join the Discussion</h2>
+
+                <p class="group-description">
+                    Share your thoughts with other group members.
+                </p>
+
+                <!--
+                    This form creates a normal comment.
+
+                    No parent_id is supplied because
+                    the comment is not a reply.
+                -->
+
+                <form
+                    method="POST"
+                    action="{% url 'add_discussion_comment' group.id discussion.id %}"
+                >
+
+                    {% csrf_token %}
+
+                    <div class="form-field">
+
+                        <label for="new-comment">
+                            Your Comment
+                        </label>
+
+                        <textarea
+                            id="new-comment"
+                            name="content"
+                            class="group-textarea"
+                            rows="4"
+                            maxlength="2000"
+                            placeholder="Write your comment..."
+                            required
+                        ></textarea>
+
+                    </div>
+
+                    <button
+                        type="submit"
+                        class="group-action"
+                    >
+                        Post Comment
+                    </button>
+
+                </form>
+
+            </section>
+
+        {% endif %}
+
+
+        <!-- ========================================
+             9. COMMENTS AND REPLIES
+        ========================================= -->
+
+        <section
+            id="discussion-comments"
+            class="members-section"
+        >
+
+            <h2>Comments &amp; Replies</h2>
+
+            <!--
+                Each comment contains:
+
+                - id
+                - author
+                - content
+                - parent_id
+                - created_at
+
+                parent_id=None:
+                    Normal comment.
+
+                parent_id=<number>:
+                    Reply to another comment.
+            -->
+
+            {% for comment in comments %}
+
+                <article
+                    class="group-card discussion-comment"
+                    id="comment-{{ comment.id }}"
+                >
+
+                    <!-- ====================================
+                         REPLY INDICATOR
+                    ==================================== -->
+
+                    {% if comment.parent_id %}
+
+                        <p class="reply-indicator">
+
+                            ↳ Replying to
+
+                            <strong>
+                                {{ comment.parent.author.username }}
+                            </strong>
+
+                        </p>
+
+                    {% endif %}
+
+
+                    <!-- ====================================
+                         COMMENT AUTHOR
+                    ==================================== -->
+
+                    <p class="group-owner">
+
+                        <strong>
+                            {{ comment.author.username }}
+                        </strong>
+
+                        ·
+
+                        {{ comment.created_at|date:"M d, Y - H:i" }}
+
+                    </p>
+
+
+                    <!-- ====================================
+                         COMMENT CONTENT
+                    ==================================== -->
+
+                    <p class="group-description">
+                        {{ comment.content|linebreaksbr }}
+                    </p>
+
+
+                    <!-- ====================================
+                         REPLY TO COMMENT
+                    ==================================== -->
+
+                    {% if is_member %}
+
+                        <!--
+                            This form creates a reply.
+
+                            The hidden parent_id tells Django
+                            which comment is being replied to.
+
+                            Replies can also receive replies.
+                        -->
+
+                        <form
+                            method="POST"
+                            action="{% url 'add_discussion_comment' group.id discussion.id %}"
+                        >
+
+                            {% csrf_token %}
+
+                            <!-- ID of the comment being replied to. -->
+                            <input
+                                type="hidden"
+                                name="parent_id"
+                                value="{{ comment.id }}"
+                            >
+
+                            <div class="form-field">
+
+                                <label for="reply-{{ comment.id }}">
+                                    Reply to {{ comment.author.username }}
+                                </label>
+
+                                <textarea
+                                    id="reply-{{ comment.id }}"
+                                    name="content"
+                                    class="group-textarea"
+                                    rows="2"
+                                    maxlength="2000"
+                                    placeholder="Write a reply..."
+                                    required
+                                ></textarea>
+
+                            </div>
+
+                            <button
+                                type="submit"
+                                class="group-action"
+                            >
+                                Reply
+                            </button>
+
+                        </form>
+
+                    {% endif %}
+
+                </article>
+
+            {% empty %}
+
+                <p class="group-description">
+                    No comments yet.
+                </p>
+
+                {% if is_member %}
+
+                    <p class="group-description">
+                        Be the first to comment!
+                    </p>
+
+                {% endif %}
+
+            {% endfor %}
+
+        </section>
+
+    </main>
+
+
+    <!-- ========================================
+         10. JAVASCRIPT
+    ========================================= -->
+
+    <script>
+
+        // ============================================
+        // A. BACK BUTTON
+        // ============================================
+
+        function goBack() {
+
+            // Get the previous page.
+            const previousPage = document.referrer;
+
+            if (previousPage) {
+
+                try {
+
+                    const previousURL = new URL(previousPage);
+
+                    // Only return through browser history when
+                    // the previous page belongs to this website
+                    // and is not the current page.
+                    if (
+                        previousURL.origin === window.location.origin
+                        && previousURL.pathname !== window.location.pathname
+                    ) {
+
+                        window.history.back();
+                        return;
+
+                    }
+
+                } catch (error) {
+
+                    // An invalid referrer will use the fallback.
+
+                }
+
+            }
+
+            // Fallback: return to the group's main page.
+            window.location.href = "{% url 'group_detail' group.id %}";
+
+        }
+
+
+        // ============================================
+        // B. LIKE BUTTON
+        // ============================================
+
+        // Find the Like form on this page.
+        const likeForm = document.getElementById("like-form");
+
+        // Public community visitors who are not members
+        // will not have a Like form.
+        if (likeForm) {
+
+            likeForm.addEventListener(
+                "submit",
+                async function(event) {
+
+                    // Prevent the normal page refresh.
+                    event.preventDefault();
+
+                    // Find the button, label, count, and error.
+                    const button = document.getElementById(
+                        "like-button"
+                    );
+
+                    const label = document.getElementById(
+                        "like-label"
+                    );
+
+                    const countElement = document.getElementById(
+                        "like-count"
+                    );
+
+                    const errorElement = document.getElementById(
+                        "like-error"
+                    );
+
+                    // Clear any previous error.
+                    errorElement.hidden = true;
+                    errorElement.textContent = "";
+
+                    // Prevent multiple clicks while saving.
+                    button.disabled = true;
+
+                    try {
+
+                        // Send the form to Django.
+                        // FormData includes the CSRF token.
+                        const response = await fetch(
+                            likeForm.action,
+                            {
+                                method: "POST",
+
+                                body: new FormData(likeForm),
+
+                                headers: {
+                                    "X-Requested-With": "XMLHttpRequest"
+                                },
+
+                                credentials: "same-origin"
+                            }
+                        );
+
+                        // Handle rejected requests.
+                        if (!response.ok) {
+
+                            throw new Error(
+                                "Unable to update your like. Please try again."
+                            );
+
+                        }
+
+                        // Read the saved result from Django.
+                        const data = await response.json();
+
+                        // Turn the button green if liked.
+                        if (data.liked) {
+
+                            button.classList.add("liked");
+
+                            button.setAttribute(
+                                "aria-pressed",
+                                "true"
+                            );
+
+                            label.textContent = "💚 Liked";
+
+                        } else {
+
+                            // Restore the normal button if unliked.
+                            button.classList.remove("liked");
+
+                            button.setAttribute(
+                                "aria-pressed",
+                                "false"
+                            );
+
+                            label.textContent = "♡ Like";
+
+                        }
+
+                        // Update the number of likes.
+                        countElement.textContent = data.like_count;
+
+                    } catch (error) {
+
+                        // Keep the previous button state
+                        // when the request fails.
+                        errorElement.textContent = error.message;
+                        errorElement.hidden = false;
+
+                    } finally {
+
+                        // Allow the developer to click again.
+                        button.disabled = false;
+
+                    }
+
+                }
+            );
+
+        }
+
+    </script>
+
+</body>
+
+</html>
