@@ -1281,15 +1281,18 @@ def send_group_message(request, group_id):
 @require_POST
 def edit_group_message(request, group_id, message_id):
     """Edit a message and broadcast the change through WebSockets."""
-
+# DEBUG: Check whether Django recognizes the AJAX request.
+    print("EDIT REQUEST RECEIVED")
+    print("AJAX HEADER:", request.headers.get("X-Requested-With"))
     # ========================================
     # 1. CHECK IF REQUEST COMES FROM JAVASCRIPT
     # ========================================
 
     # AJAX requests receive JSON instead of redirects.
+# Check whether JavaScript sent this request.
     is_ajax = (
         request.headers.get("X-Requested-With") == "XMLHttpRequest"
-    )
+    )   
 
     # ========================================
     # 2. FIND THE GROUP
@@ -1464,74 +1467,6 @@ def edit_group_message(request, group_id, message_id):
             kwargs={"group_id": group.id},
         ) + "#group-chat"
     )
-# ============================================================
-# 17. EDIT GROUP CHAT MESSAGE
-# ============================================================
-
-@login_required
-@require_POST
-def edit_group_message(request, group_id, message_id):
-    """Allow a developer to edit their own text or code message."""
-
-    group = get_object_or_404(
-        ProjectGroup,
-        id=group_id,
-    )
-
-    if not is_group_member(group, request.user):
-
-        return HttpResponseForbidden(
-            "You must be a group member to edit messages."
-        )
-
-    chat_message = get_object_or_404(
-        GroupChatMessage,
-        id=message_id,
-        group=group,
-    )
-
-    # A developer cannot edit another person's message.
-    if chat_message.sender_id != request.user.id:
-
-        return HttpResponseForbidden(
-            "You can only edit your own messages."
-        )
-
-    if chat_message.deleted_at:
-
-        return HttpResponseBadRequest(
-            "Deleted messages cannot be edited."
-        )
-
-    # Only text and code messages are editable.
-    if chat_message.message_type not in ("text", "code"):
-
-        return HttpResponseBadRequest(
-            "Only text and code messages can be edited."
-        )
-
-    new_content = request.POST.get("content", "").strip()
-
-    if not new_content:
-
-        return HttpResponseBadRequest(
-            "Message content cannot be empty."
-        )
-
-    chat_message.content = new_content
-    chat_message.edited_at = timezone.now()
-    chat_message.save()
-
-    messages.success(
-        request,
-        "Message updated successfully.",
-    )
-
-    return redirect(
-        "group_chat",
-        group_id=group.id,
-    )
-
 
 # ============================================================
 # 18. DELETE GROUP CHAT MESSAGE

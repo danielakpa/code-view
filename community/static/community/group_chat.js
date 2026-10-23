@@ -566,41 +566,60 @@ document.addEventListener("DOMContentLoaded", function () {
     // ========================================
     // 5. UPDATE EDITED MESSAGES
     // ========================================
+// ========================================
+// UPDATE EDITED MESSAGES IN REAL TIME
+// ========================================
+// ========================================
+// UPDATE EDITED MESSAGES WITHOUT REFRESHING
+// ========================================
 
-    function handleEditedMessage(data) {
+function handleEditedMessage(data) {
 
-        const messageElement = findMessage(data.message_id);
+    // Find the message using its ID.
+    const messageElement = document.getElementById(
+        `message-${data.message_id}`
+    );
 
-        if (!messageElement) {
-            return;
-        }
+    if (!messageElement) {
+        console.error("Message not found:", data.message_id);
+        return;
+    }
 
-        const contentElement = messageElement.querySelector(
-            ".chat-message-content"
+    // Find the displayed message content.
+    const contentElement = messageElement.querySelector(
+        ".chat-message-content, .message-content"
+    );
+
+    if (!contentElement) {
+        console.error("Message content not found:", data.message_id);
+        return;
+    }
+
+    // Immediately display the edited message.
+    contentElement.textContent = data.content;
+
+    // Preserve line breaks.
+    contentElement.style.whiteSpace = "pre-wrap";
+
+    // Close the edit form.
+    const editForm = document.getElementById(
+        `edit-form-${data.message_id}`
+    );
+
+    if (editForm) {
+        editForm.hidden = true;
+
+        const textarea = editForm.querySelector(
+            ".message-edit-input"
         );
 
-        if (contentElement) {
-            contentElement.textContent = data.content;
-            contentElement.style.whiteSpace = "pre-wrap";
-        }
-
-        const editForm = document.getElementById(
-            `edit-form-${data.message_id}`
-        );
-
-        if (editForm) {
-
-            editForm.hidden = true;
-
-            const editInput = editForm.querySelector(
-                ".message-edit-input"
-            );
-
-            if (editInput) {
-                editInput.value = data.content;
-            }
+        if (textarea) {
+            textarea.value = data.content;
         }
     }
+
+    console.log("Message edited successfully:", data.message_id);
+}
 
     // ========================================
     // 6. REMOVE DELETED MESSAGES
@@ -897,11 +916,36 @@ document.addEventListener("DOMContentLoaded", function () {
 
         try {
 
-            // Django updates the database and broadcasts
-            // the event to every connected group member.
-            await submitForm(form);
+          // Send the edit or delete request to Django.
+const response = await submitForm(form);
 
-            form.hidden = true;
+// Read Django's JSON response.
+const result = await response.json();
+
+// Make sure Django accepted the request.
+if (!result.success) {
+    throw new Error(result.error || "Action failed.");
+}
+
+// Immediately update the edited message.
+if (isEdit) {
+
+    handleEditedMessage({
+        message_id: result.message_id,
+        content: result.content
+    });
+}
+
+// Immediately remove the deleted message.
+if (isDelete) {
+
+    handleDeletedMessage({
+        message_id: result.message_id
+    });
+}
+
+// Hide the form after success.
+form.hidden = true;
 
         } catch (error) {
 

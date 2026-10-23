@@ -986,6 +986,32 @@
         ==================================== -->
 
         <div class="chat-composer">
+            <!-- ========================================
+     REPLY PREVIEW
+======================================== -->
+
+<div class="chat-reply-preview" id="chat-reply-preview" hidden>
+
+    <!-- Display the developer being replied to -->
+    <div class="reply-preview-details">
+
+        <strong id="reply-preview-sender"></strong>
+
+        <!-- Display the original message -->
+        <p id="reply-preview-content"></p>
+
+    </div>
+
+    <!-- Cancel the reply -->
+    <button
+        type="button"
+        id="cancel-reply-button"
+        aria-label="Cancel reply"
+    >
+        ✕
+    </button>
+
+</div>
             <form
                 method="POST"
                 action="{% url 'send_group_message' group.id %}"
