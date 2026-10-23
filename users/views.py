@@ -18,7 +18,7 @@ def register(request):
             login(request, user)
 
             # Redirect directly to the Community page.
-            return redirect("community")
+            return redirect("groups")
 
     else:
         # Display an empty registration form.
@@ -47,7 +47,7 @@ def user_login(request):
             login(request, user)
 
             # Send the user directly to the Community page.
-            return redirect("community")
+            return redirect("groups")
 
         # Display an error if login fails.
         return render(

@@ -251,7 +251,7 @@
         <button
             type="button"
             class="page-back-button"
-            onclick="goBack()"
+            data-fallback-url="{% url 'group_detail' group.id %}"
         >
             ← Back
         </button>
@@ -345,8 +345,12 @@
                             class="like-button {% if liked_by_user %}liked{% endif %}"
                             aria-pressed="{% if liked_by_user %}true{% else %}false{% endif %}"
                         >
+                    
 
-                            <span id="like-label">
+                            <span
+                                id="like-label"
+                                class="like-label"
+                            >
 
                                 {% if liked_by_user %}
                                     💚 Liked
@@ -640,172 +644,22 @@
          10. JAVASCRIPT
     ========================================= -->
 
-    <script>
+    <!--
+        Reuse the JavaScript already used by group_detail.html.
 
-        // ============================================
-        // A. BACK BUTTON
-        // ============================================
+        Responsibilities:
+        1. Handle Back navigation.
+        2. Send Like/Unlike requests to Django.
+        3. Update the Like button without refreshing.
+        4. Update the Like count.
+        5. Display errors when requests fail.
+    -->
 
-        function goBack() {
+    <script
+        src="{% static 'community/discussions.js' %}"
+        defer
+    ></script>
 
-            // Get the previous page.
-            const previousPage = document.referrer;
-
-            if (previousPage) {
-
-                try {
-
-                    const previousURL = new URL(previousPage);
-
-                    // Only return through browser history when
-                    // the previous page belongs to this website
-                    // and is not the current page.
-                    if (
-                        previousURL.origin === window.location.origin
-                        && previousURL.pathname !== window.location.pathname
-                    ) {
-
-                        window.history.back();
-                        return;
-
-                    }
-
-                } catch (error) {
-
-                    // An invalid referrer will use the fallback.
-
-                }
-
-            }
-
-            // Fallback: return to the group's main page.
-            window.location.href = "{% url 'group_detail' group.id %}";
-
-        }
-
-
-        // ============================================
-        // B. LIKE BUTTON
-        // ============================================
-
-        // Find the Like form on this page.
-        const likeForm = document.getElementById("like-form");
-
-        // Public community visitors who are not members
-        // will not have a Like form.
-        if (likeForm) {
-
-            likeForm.addEventListener(
-                "submit",
-                async function(event) {
-
-                    // Prevent the normal page refresh.
-                    event.preventDefault();
-
-                    // Find the button, label, count, and error.
-                    const button = document.getElementById(
-                        "like-button"
-                    );
-
-                    const label = document.getElementById(
-                        "like-label"
-                    );
-
-                    const countElement = document.getElementById(
-                        "like-count"
-                    );
-
-                    const errorElement = document.getElementById(
-                        "like-error"
-                    );
-
-                    // Clear any previous error.
-                    errorElement.hidden = true;
-                    errorElement.textContent = "";
-
-                    // Prevent multiple clicks while saving.
-                    button.disabled = true;
-
-                    try {
-
-                        // Send the form to Django.
-                        // FormData includes the CSRF token.
-                        const response = await fetch(
-                            likeForm.action,
-                            {
-                                method: "POST",
-
-                                body: new FormData(likeForm),
-
-                                headers: {
-                                    "X-Requested-With": "XMLHttpRequest"
-                                },
-
-                                credentials: "same-origin"
-                            }
-                        );
-
-                        // Handle rejected requests.
-                        if (!response.ok) {
-
-                            throw new Error(
-                                "Unable to update your like. Please try again."
-                            );
-
-                        }
-
-                        // Read the saved result from Django.
-                        const data = await response.json();
-
-                        // Turn the button green if liked.
-                        if (data.liked) {
-
-                            button.classList.add("liked");
-
-                            button.setAttribute(
-                                "aria-pressed",
-                                "true"
-                            );
-
-                            label.textContent = "💚 Liked";
-
-                        } else {
-
-                            // Restore the normal button if unliked.
-                            button.classList.remove("liked");
-
-                            button.setAttribute(
-                                "aria-pressed",
-                                "false"
-                            );
-
-                            label.textContent = "♡ Like";
-
-                        }
-
-                        // Update the number of likes.
-                        countElement.textContent = data.like_count;
-
-                    } catch (error) {
-
-                        // Keep the previous button state
-                        // when the request fails.
-                        errorElement.textContent = error.message;
-                        errorElement.hidden = false;
-
-                    } finally {
-
-                        // Allow the developer to click again.
-                        button.disabled = false;
-
-                    }
-
-                }
-            );
-
-        }
-
-    </script>
 
 </body>
 
