@@ -99,93 +99,76 @@
 
 
             <!-- MAIN GROUP NAVIGATION -->
+<!-- ====================================
+     MAIN GROUP NAVIGATION
+==================================== -->
 
-            <nav
-                class="sidebar-links"
-                aria-label="Group navigation"
+<nav
+    class="sidebar-links"
+    aria-label="Group navigation"
+>
+
+    <!-- Discussions are available to group viewers. -->
+    <a
+        href="#group-discussions"
+        class="sidebar-link active"
+        data-workspace-tab="discussions"
+        aria-current="page"
+    >
+        💬
+
+        <span class="sidebar-link-text">
+            Discussions
+        </span>
+    </a>
+
+    {% if is_member %}
+
+        <!-- Group Chat: available to members only. -->
+        <a
+            href="#group-chat"
+            class="sidebar-link"
+            data-workspace-tab="chat"
+        >
+            #
+
+            <span class="sidebar-link-text">
+                Group Chat
+            </span>
+        </a>
+
+        <!-- Group Members. -->
+        <a
+            href="#group-members"
+            class="sidebar-link"
+            data-workspace-tab="members"
+        >
+            👥
+
+            <span class="sidebar-link-text">
+                Members
+            </span>
+        </a>
+
+        <!-- Development Room: private groups only. -->
+        {% if group.is_private %}
+
+            <a
+                href="{% url 'meeting_room' group.id %}"
+                class="sidebar-link"
             >
+                🚀
 
-                <!-- Discussions are visible to group viewers. -->
-                <a
-                    href="{% url 'group_detail' group.id %}#group-discussions"
-                    class="sidebar-link active"
-                    aria-current="page"
-                    title="Discussions"
-                >
-                    💬
+                <span class="sidebar-link-text">
+                    Development Room
+                </span>
+            </a>
 
-                    <span class="sidebar-link-text">
-                        Discussions
-                    </span>
+        {% endif %}
 
-                </a>
+    {% endif %}
 
-
-                <!-- Member-only features. -->
-                {% if is_member %}
-
-                    <a
-                        href="{% url 'group_chat' group.id %}"
-                        class="sidebar-link"
-                        title="Group Chat"
-                    >
-                        #
-
-                        <span class="sidebar-link-text">
-                            Group Chat
-                        </span>
-
-                    </a>
-
-
-                    <!-- Private development features. -->
-                    {% if group.is_private %}
-
-                        <a
-                            href="{% url 'code_board' group.id %}"
-                            class="sidebar-link"
-                            title="Code Board"
-                        >
-                            &lt;/&gt;
-
-                            <span class="sidebar-link-text">
-                                Code Board
-                            </span>
-
-                        </a>
-
-                        <a
-                            href="{% url 'meeting_room' group.id %}"
-                            class="sidebar-link"
-                            title="Meeting Room"
-                        >
-                            📹
-
-                            <span class="sidebar-link-text">
-                                Meeting Room
-                            </span>
-
-                        </a>
-
-                    {% endif %}
-
-
-                    <a
-                        href="#group-members"
-                        class="sidebar-link"
-                        title="Members"
-                    >
-                        👥
-
-                        <span class="sidebar-link-text">
-                            Members
-                        </span>
-
-                    </a>
-
-                {% endif %}
-
-            </nav>
+</nav>
 
 
             <!-- ====================================
@@ -719,6 +702,329 @@
                     {% endfor %}
 
                 </section>
+                <!-- ========================================
+     GROUP CHAT PANEL
+     Visible to group members only.
+======================================== -->
+
+{% if is_member %}
+
+    <section
+        class="workspace-section workspace-panel"
+        id="group-chat"
+        data-workspace-panel="chat"
+        hidden
+    >
+
+        <!-- CHAT HEADER -->
+
+        <header class="chat-header">
+
+            <div>
+                <h2>
+                    # {{ group.name }}
+                </h2>
+
+                <p class="workspace-section-description">
+                    Chat, share code, and collaborate
+                    with your group members.
+                </p>
+            </div>
+
+        </header>
+
+
+        <!-- ====================================
+             CHAT MESSAGE HISTORY
+        ==================================== -->
+
+        <div
+            class="chat-messages"
+            id="chat-messages"
+            aria-label="Group chat messages"
+        >
+
+            {% for chat_message in chat_messages %}
+
+                <article
+                    class="chat-message"
+                    id="message-{{ chat_message.id }}"
+                >
+
+                    <!-- Sender avatar. -->
+                    <div class="message-avatar">
+                        {{ chat_message.sender.username|first|upper }}
+                    </div>
+
+                    <div class="message-body">
+
+                        <!-- Sender information. -->
+                        <div class="message-header">
+
+                            <strong class="message-author">
+                                {{ chat_message.sender.username }}
+                            </strong>
+
+                            <time class="message-time">
+                                {{ chat_message.created_at|date:"M d, Y - H:i" }}
+                            </time>
+
+                        </div>
+
+
+                        <!-- REPLY PREVIEW -->
+
+                        {% if chat_message.reply_to %}
+
+                            <div class="message-reply">
+
+                                ↳ Replying to
+
+                                <strong>
+                                    {{ chat_message.reply_to.sender.username }}
+                                </strong>
+
+                                {% if chat_message.reply_to.content %}
+
+                                    <p>
+                                        {{ chat_message.reply_to.content|truncatechars:100 }}
+                                    </p>
+
+                                {% endif %}
+
+                            </div>
+
+                        {% endif %}
+
+
+                        <!-- TEXT MESSAGE -->
+
+                        {% if chat_message.message_type == "text" %}
+
+                            <div class="message-content">
+                                {{ chat_message.content|linebreaksbr }}
+                            </div>
+
+                        {% endif %}
+
+
+                        <!-- CODE MESSAGE -->
+
+                        {% if chat_message.message_type == "code" %}
+
+                            {% if chat_message.code_language %}
+
+                                <div class="code-language">
+                                    {{ chat_message.code_language }}
+                                </div>
+
+                            {% endif %}
+
+                            <pre class="message-code"><code>{{ chat_message.content }}</code></pre>
+
+                        {% endif %}
+
+
+                        <!-- VOICE MESSAGE -->
+
+                        {% if chat_message.message_type == "voice" %}
+
+                            {% if chat_message.attachment %}
+
+                                <audio
+                                    controls
+                                    preload="none"
+                                    class="message-audio"
+                                    src="{{ chat_message.attachment.url }}"
+                                ></audio>
+
+                            {% endif %}
+
+                            {% if chat_message.content %}
+
+                                <p class="message-content">
+                                    {{ chat_message.content }}
+                                </p>
+
+                            {% endif %}
+
+                        {% endif %}
+
+
+                        <!-- FILE MESSAGE -->
+
+                        {% if chat_message.message_type == "file" %}
+
+                            {% if chat_message.content %}
+
+                                <p class="message-content">
+                                    {{ chat_message.content|linebreaksbr }}
+                                </p>
+
+                            {% endif %}
+
+                            {% if chat_message.attachment %}
+
+                                <a
+                                    href="{{ chat_message.attachment.url }}"
+                                    class="message-attachment"
+                                    download
+                                >
+                                    📎 Download Attachment
+                                </a>
+
+                            {% endif %}
+
+                        {% endif %}
+
+
+                        <!-- ====================================
+                             MESSAGE ACTIONS
+                        ==================================== -->
+
+                        <div class="message-actions">
+
+                            <!-- Reply to any message. -->
+                            <button
+                                type="button"
+                                class="reply-button"
+                                data-message-id="{{ chat_message.id }}"
+                                data-sender="{{ chat_message.sender.username }}"
+                            >
+                                ↩ Reply
+                            </button>
+
+                            <!-- Only the sender sees these actions. -->
+                            {% if chat_message.sender_id == request.user.id %}
+
+                                <button
+                                    type="button"
+                                    class="edit-button"
+                                    data-message-id="{{ chat_message.id }}"
+                                >
+                                    ✏️ Edit
+                                </button>
+
+                                <button
+                                    type="button"
+                                    class="delete-button"
+                                    data-message-id="{{ chat_message.id }}"
+                                >
+                                    🗑 Delete
+                                </button>
+
+                            {% endif %}
+
+                        </div>
+
+                    </div>
+
+                </article>
+
+            {% empty %}
+
+                <p class="chat-empty">
+                    No messages yet. Start the conversation!
+                </p>
+
+            {% endfor %}
+
+        </div>
+
+
+        <!-- ====================================
+             CHAT MESSAGE COMPOSER
+        ==================================== -->
+
+        <div class="chat-composer">
+
+            <form
+                method="POST"
+                action="{% url 'send_group_message' group.id %}"
+                enctype="multipart/form-data"
+                id="chat-form"
+            >
+
+                {% csrf_token %}
+
+                <!-- Display form validation errors. -->
+                {% if chat_form.errors %}
+
+                    <div class="composer-error">
+                        {{ chat_form.errors }}
+                    </div>
+
+                {% endif %}
+
+
+                <!-- MESSAGE OPTIONS -->
+
+                <div class="composer-options">
+
+                    <label for="{{ chat_form.message_type.id_for_label }}">
+                        Type
+                    </label>
+
+                    {{ chat_form.message_type }}
+
+                    <label for="{{ chat_form.code_language.id_for_label }}">
+                        Language
+                    </label>
+
+                    {{ chat_form.code_language }}
+
+                </div>
+
+
+                <!-- MESSAGE INPUT -->
+
+                <div class="composer-box">
+
+                    <!-- File attachment. -->
+                    <div class="composer-file-input">
+                        {{ chat_form.attachment }}
+                    </div>
+
+                    <!-- Message content. -->
+                    <textarea
+                        name="content"
+                        id="id_content"
+                        class="composer-textarea"
+                        rows="2"
+                        placeholder="Message #{{ group.name }}"
+                    >{{ chat_form.content.value|default_if_none:"" }}</textarea>
+
+
+                    <!-- Voice recording: future feature. -->
+                    <button
+                        type="button"
+                        class="composer-button"
+                        id="record-voice-button"
+                        title="Record voice note (coming soon)"
+                        disabled
+                    >
+                        🎤
+                    </button>
+
+
+                    <!-- Send message. -->
+                    <button
+                        type="submit"
+                        class="composer-button composer-send"
+                        title="Send message"
+                    >
+                        ➤
+                    </button>
+
+                </div>
+
+            </form>
+
+        </div>
+
+    </section>
+
+{% endif %}
 
 
                 <!-- ====================================
@@ -803,11 +1109,17 @@
 
         We are keeping the existing file.
     -->
+<!-- Existing discussion interactions. -->
+<script
+    src="{% static 'community/discussions.js' %}"
+    defer
+></script>
 
-    <script
-        src="{% static 'community/discussions.js' %}"
-        defer
-    ></script>
+<!-- New workspace navigation. -->
+<script
+    src="{% static 'community/group_workspace.js' %}"
+    defer
+></script>
 
 </body>
 

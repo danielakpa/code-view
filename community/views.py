@@ -286,28 +286,41 @@ def join_group(request, group_id):
 # ============================================================
 # 4. GROUP DETAILS
 # ============================================================
-
 @login_required
 def group_detail(request, group_id):
-    """Display group details and recent discussions."""
+    """
+    Display the unified group workspace.
 
+    The workspace contains:
+    1. Discussions
+    2. Group Chat
+    3. Group Members
+
+    Chat messages are loaded only for group members.
+    """
+
+    # Find the group or return 404 if it does not exist.
     group = get_object_or_404(
         ProjectGroup,
         id=group_id,
     )
 
+    # Check whether the logged-in developer belongs to this group.
     membership = GroupMember.objects.filter(
         group=group,
         user=request.user,
     ).first()
 
-    # Private groups are accessible only to members.
+    # Only members can enter private groups.
     if group.is_private and membership is None:
-
         return HttpResponseForbidden(
             "You must be a member to access this private group."
         )
 
+    # Store membership status for easier checking.
+    is_member = membership is not None
+
+    # Load the members of this group.
     members = (
         GroupMember.objects
         .filter(group=group)
@@ -315,18 +328,24 @@ def group_detail(request, group_id):
         .order_by("joined_at")
     )
 
+    # Check whether the developer has a pending membership request.
     pending_request = GroupMembershipRequest.objects.filter(
         group=group,
         user=request.user,
         status="pending",
     ).exists()
 
+    # Check whether the developer is a group administrator.
     is_admin = (
-        membership is not None
+        is_member
         and membership.role == "admin"
     )
 
-    # Exclude posts hidden by the current developer.
+    # ========================================
+    # 1. LOAD GROUP DISCUSSIONS
+    # ========================================
+
+    # Find discussions hidden by the logged-in developer.
     hidden_discussion_ids = HiddenDiscussion.objects.filter(
         user=request.user,
     ).values_list(
@@ -334,11 +353,7 @@ def group_detail(request, group_id):
         flat=True,
     )
 
-    # Load recent discussions with their like/comment counts.
-    #
-    # distinct=True prevents incorrect totals when a discussion
-    # has multiple likes and multiple comments.
-    # Load discussions and calculate likes and comments.
+    # Load the latest 20 discussions.
     discussions = list(
         GroupDiscussion.objects
         .filter(group=group)
@@ -351,7 +366,7 @@ def group_detail(request, group_id):
         .order_by("-created_at")[:20]
     )
 
-    # Find discussions liked by the logged-in developer.
+    # Find discussions already liked by this developer.
     liked_discussion_ids = set(
         GroupDiscussionLike.objects
         .filter(
@@ -361,25 +376,66 @@ def group_detail(request, group_id):
         .values_list("discussion_id", flat=True)
     )
 
-    # Tell the template whether each post is already liked.
+    # Mark each discussion as liked or not liked.
     for discussion in discussions:
         discussion.liked_by_user = (
             discussion.id in liked_discussion_ids
         )
 
+    # ========================================
+    # 2. LOAD GROUP CHAT
+    # ========================================
+
+    # Default values for developers who are not members.
+    chat_messages = []
+    chat_form = None
+
+    # Only group members can access chat information.
+    if is_member:
+
+        # Fetch the latest 50 messages.
+        chat_messages = list(
+            GroupChatMessage.objects
+            .filter(group=group)
+            .select_related(
+                "sender",
+                "reply_to",
+                "reply_to__sender",
+            )
+            .order_by("-created_at", "-id")[:50]
+        )
+
+        # Display messages from oldest to newest.
+        chat_messages.reverse()
+
+        # Create the form used to send chat messages.
+        chat_form = GroupChatMessageForm()
+
+    # ========================================
+    # 3. RENDER THE UNIFIED WORKSPACE
+    # ========================================
+
     return render(
         request,
         "community/group_detail.html",
         {
+            # Group information.
             "group": group,
+
+            # Membership information.
             "members": members,
-            "is_member": membership is not None,
+            "is_member": is_member,
             "is_admin": is_admin,
             "pending_request": pending_request,
+
+            # Discussion information.
             "discussions": discussions,
+
+            # Chat information.
+            "chat_messages": chat_messages,
+            "chat_form": chat_form,
         },
     )
-
 
 # ============================================================
 # 5. REVIEW MEMBERSHIP REQUESTS

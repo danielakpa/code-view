@@ -422,3 +422,391 @@ body {
         padding: 16px;
     }
 }
+
+/* Hide inactive workspace sections. */
+[hidden] {
+    display: none !important;
+}
+
+/* ==========================================
+   10. GROUP CHAT WORKSPACE
+   Keep the original CodeView chat design.
+========================================== */
+
+/*
+   When Group Chat is active:
+   - Remove the discussion card appearance.
+   - Use the available workspace height.
+   - Keep the message composer at the bottom.
+*/
+
+.workspace-main:has(#group-chat:not([hidden])) {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+    padding: 0;
+}
+
+.workspace-main:has(#group-chat:not([hidden])) .workspace-content {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    width: 100%;
+    max-width: none;
+    min-height: 0;
+    margin: 0;
+}
+
+/* Main chat container. */
+#group-chat {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    margin: 0;
+    padding: 0;
+    background: #17181b;
+    border: none;
+    border-radius: 0;
+}
+
+/* ==========================================
+   11. CHAT HEADER
+========================================== */
+
+#group-chat .chat-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 15px;
+    padding: 20px 25px;
+    border-bottom: 1px solid #35363b;
+    flex-shrink: 0;
+}
+
+#group-chat .chat-header h2 {
+    margin: 0;
+    font-size: 19px;
+    color: #f3f4f6;
+}
+
+#group-chat .chat-header p {
+    margin: 6px 0 0;
+    color: #9ca3af;
+    font-size: 13px;
+}
+
+/* ==========================================
+   12. CHAT MESSAGE HISTORY
+========================================== */
+
+#group-chat .chat-messages {
+    flex: 1;
+    min-height: 0;
+    padding: 25px;
+    overflow-y: auto;
+}
+
+/* Individual message. */
+#group-chat .chat-message {
+    display: flex;
+    align-items: flex-start;
+    gap: 13px;
+    padding: 13px 10px;
+    margin-bottom: 5px;
+    border-radius: 8px;
+}
+
+#group-chat .chat-message:hover {
+    background: #202126;
+}
+
+/* Developer avatar. */
+#group-chat .message-avatar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 39px;
+    height: 39px;
+    flex-shrink: 0;
+    background: #244c38;
+    color: #86efac;
+    border-radius: 50%;
+    font-weight: 700;
+}
+
+/* Message content container. */
+#group-chat .message-body {
+    flex: 1;
+    min-width: 0;
+}
+
+/* Developer name and message time. */
+#group-chat .message-header {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 7px;
+}
+
+#group-chat .message-author {
+    color: #4ade80;
+    font-size: 14px;
+    font-weight: 700;
+}
+
+#group-chat .message-time {
+    color: #858994;
+    font-size: 12px;
+}
+
+/* Normal text messages. */
+#group-chat .message-content {
+    color: #e5e7eb;
+    font-size: 14px;
+    line-height: 1.7;
+    overflow-wrap: anywhere;
+}
+
+/* ==========================================
+   13. MESSAGE REPLIES
+========================================== */
+
+#group-chat .message-reply {
+    padding: 10px 12px;
+    margin-bottom: 10px;
+    background: #25272d;
+    border-left: 3px solid #22c55e;
+    border-radius: 5px;
+    color: #d1d5db;
+    font-size: 12px;
+}
+
+#group-chat .message-reply p {
+    margin: 5px 0 0;
+}
+
+/* ==========================================
+   14. CODE MESSAGES
+========================================== */
+
+#group-chat .message-code {
+    padding: 16px;
+    margin-top: 10px;
+    background: #0f1117;
+    border: 1px solid #343842;
+    border-radius: 8px;
+    color: #d1fae5;
+    font-size: 13px;
+    line-height: 1.6;
+    overflow-x: auto;
+}
+
+#group-chat .code-language {
+    margin-bottom: 8px;
+    color: #4ade80;
+    font-size: 12px;
+}
+
+/* ==========================================
+   15. FILE AND VOICE MESSAGES
+========================================== */
+
+#group-chat .message-attachment {
+    display: inline-block;
+    margin-top: 10px;
+    color: #86efac;
+}
+
+#group-chat .message-audio {
+    display: block;
+    max-width: 100%;
+    margin-top: 10px;
+}
+
+/* ==========================================
+   16. MESSAGE ACTIONS
+========================================== */
+
+#group-chat .message-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+    margin-top: 10px;
+}
+
+#group-chat .message-actions button {
+    padding: 0;
+    background: transparent;
+    border: none;
+    color: #9296a1;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+#group-chat .message-actions button:hover {
+    color: #4ade80;
+}
+
+/* Empty chat message. */
+#group-chat .chat-empty {
+    padding: 60px 20px;
+    color: #9ca3af;
+    text-align: center;
+}
+
+/* ==========================================
+   17. MESSAGE COMPOSER
+========================================== */
+
+/*
+   The composer stays at the bottom because
+   the chat uses a flex-column layout.
+
+   Only the message history scrolls.
+*/
+
+#group-chat .chat-composer {
+    padding: 18px 25px 25px;
+    background: #17181b;
+    border-top: 1px solid #35363b;
+    flex-shrink: 0;
+}
+
+/* Message type and language controls. */
+#group-chat .composer-options {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 12px;
+}
+
+#group-chat .composer-options label {
+    color: #9ca3af;
+    font-size: 12px;
+}
+
+#group-chat .composer-options select,
+#group-chat .composer-options input {
+    max-width: 180px;
+    padding: 7px;
+    background: #26282d;
+    border: 1px solid #41434a;
+    border-radius: 6px;
+    color: #ffffff;
+}
+
+/* Main message input box. */
+#group-chat .composer-box {
+    display: flex;
+    align-items: flex-end;
+    gap: 12px;
+    padding: 12px;
+    background: #26282d;
+    border: 1px solid #41434a;
+    border-radius: 12px;
+}
+
+/* Message textarea. */
+#group-chat .composer-textarea {
+    flex: 1;
+    min-width: 0;
+    min-height: 44px;
+    max-height: 150px;
+    padding: 12px 5px;
+    resize: vertical;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: #ffffff;
+    font-family: inherit;
+    font-size: 14px;
+}
+
+#group-chat .composer-textarea::placeholder {
+    color: #9ca3af;
+}
+
+/* File attachment input. */
+#group-chat .composer-file-input {
+    max-width: 220px;
+    color: #d1d5db;
+    font-size: 12px;
+}
+
+/* Microphone and send buttons. */
+#group-chat .composer-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 39px;
+    height: 39px;
+    flex-shrink: 0;
+    background: #383b42;
+    border: none;
+    border-radius: 9px;
+    color: #e5e7eb;
+    font-size: 19px;
+    cursor: pointer;
+}
+
+#group-chat .composer-button:hover {
+    background: #4b5563;
+}
+
+/* Send message button. */
+#group-chat .composer-send {
+    background: #16a34a;
+    color: #ffffff;
+}
+
+#group-chat .composer-send:hover {
+    background: #15803d;
+}
+
+/* Disabled microphone button. */
+#group-chat .composer-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Form validation errors. */
+#group-chat .composer-error {
+    margin-bottom: 12px;
+    color: #fca5a5;
+    font-size: 13px;
+}
+
+/* ==========================================
+   18. CHAT RESPONSIVE DESIGN
+========================================== */
+
+@media (max-width: 750px) {
+
+    #group-chat .chat-header,
+    #group-chat .chat-messages,
+    #group-chat .chat-composer {
+        padding-left: 12px;
+        padding-right: 12px;
+    }
+
+    #group-chat .composer-box {
+        flex-wrap: wrap;
+    }
+
+    #group-chat .composer-file-input {
+        max-width: 100%;
+    }
+
+    #group-chat .composer-options {
+        gap: 10px;
+    }
+
+    #group-chat .composer-options select,
+    #group-chat .composer-options input {
+        max-width: 140px;
+    }
+}
