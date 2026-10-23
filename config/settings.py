@@ -32,19 +32,27 @@ ALLOWED_HOSTS = []
 
 # Application definition
 
+# Applications installed in CodeView.
 INSTALLED_APPS = [
+
+    # Daphne runs Django's ASGI application.
+    # ASGI allows Django to handle WebSocket connections.
+    'daphne',
+
+    # Django built-in applications.
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'home',                                  # Our CodeView home page app
-    'users',
-    'community'                                 # Handles CodeView user accounts
 
-    
+    # CodeView applications.
+    'home',
+    'users',
+    'community',
 ]
+
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -74,6 +82,12 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'config.wsgi.application'
+
+# WSGI handles traditional Django HTTP applications.
+WSGI_APPLICATION = "config.wsgi.application"
+
+# ASGI supports HTTP and real-time WebSocket connections.
+ASGI_APPLICATION = "config.asgi.application"
 
 
 # Database
@@ -136,3 +150,10 @@ LOGIN_REDIRECT_URL = "groups"
 
 # Where unauthenticated users are sent.
 LOGIN_URL = "login"
+
+
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels.layers.InMemoryChannelLayer",
+    },
+}

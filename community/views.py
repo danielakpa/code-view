@@ -1,12 +1,14 @@
 """Handle CodeView groups, memberships, discussions, chat, and workspaces."""
-
+from django.http import JsonResponse
 from django.contrib import messages
+from django.db import transaction
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
 from django.urls import reverse
 from django.shortcuts import redirect
-
+from channels.layers import get_channel_layer
+from asgiref.sync import async_to_sync
 from django.db.models import Q, Count
 from django.http import (
     HttpResponseForbidden,
@@ -1107,11 +1109,10 @@ def group_chat(request, group_id):
 # ============================================================
 # 16. SEND GROUP CHAT MESSAGE
 # ============================================================
-
 @login_required
 @require_POST
 def send_group_message(request, group_id):
-    """Save a group message and return to the unified Group Chat."""
+    """Save a group message and broadcast it through WebSockets."""
 
     # Find the group or return 404.
     group = get_object_or_404(
@@ -1125,21 +1126,44 @@ def send_group_message(request, group_id):
             "You must be a group member to send messages."
         )
 
-    # Validate message content and uploaded attachments.
+    # Validate the message and uploaded files.
     form = GroupChatMessageForm(
         request.POST,
         request.FILES,
     )
 
-    # If validation fails, display an error.
+        # ========================================
+    # CHECK IF REQUEST COMES FROM JAVASCRIPT
+    # ========================================
+
+    # AJAX requests should receive JSON instead of redirects.
+    is_ajax = (
+        request.headers.get("X-Requested-With") == "XMLHttpRequest"
+    )
+
+    # ========================================
+    # HANDLE INVALID MESSAGES
+    # ========================================
+
     if not form.is_valid():
 
+        # Return an error response to JavaScript.
+        if is_ajax:
+            return JsonResponse(
+                {
+                    "success": False,
+                    "error": "Your message is invalid.",
+                    "details": form.errors.get_json_data(),
+                },
+                status=400,
+            )
+
+        # Keep the original behavior for normal HTML forms.
         messages.error(
             request,
             "Your message is invalid. Check the content or attachment.",
         )
 
-        # Return to the Group Chat tab.
         return redirect(
             reverse(
                 "group_detail",
@@ -1147,10 +1171,14 @@ def send_group_message(request, group_id):
             ) + "#group-chat"
         )
 
-    # Create the message without saving it immediately.
+    # ========================================
+    # CREATE MESSAGE
+    # ========================================
+
+    # Create the message without saving immediately.
     chat_message = form.save(commit=False)
 
-    # Assign the group and sender on the server.
+    # Assign the group and sender.
     chat_message.group = group
     chat_message.sender = request.user
 
@@ -1158,15 +1186,14 @@ def send_group_message(request, group_id):
     # HANDLE MESSAGE REPLIES
     # ========================================
 
-    # Get the ID of the message being replied to.
     reply_to_id = request.POST.get(
         "reply_to_id",
         "",
     ).strip()
 
-    # If this message is a reply, find the original message.
     if reply_to_id:
 
+        # Make sure the original message belongs to this group.
         reply_to_message = get_object_or_404(
             GroupChatMessage,
             id=reply_to_id,
@@ -1175,13 +1202,74 @@ def send_group_message(request, group_id):
 
         chat_message.reply_to = reply_to_message
 
-    # Save the completed message.
+    # ========================================
+    # SAVE MESSAGE
+    # ========================================
+
+    # Save the completed message to the database.
     chat_message.save()
 
     # ========================================
-    # RETURN TO THE UNIFIED GROUP CHAT
+    # BROADCAST MESSAGE THROUGH WEBSOCKETS
     # ========================================
 
+    # Get Django Channels' communication layer.
+    channel_layer = get_channel_layer()
+
+    # This must match the group name in consumers.py.
+    room_group_name = f"group_chat_{group.id}"
+
+    # Prepare the data that connected browsers will receive.
+    message_data = {
+        "type": "message_created",
+        "message_id": chat_message.id,
+        "group_id": group.id,
+        "sender_id": request.user.id,
+        "sender": request.user.username,
+        "content": chat_message.content,
+        "message_type": chat_message.message_type,
+        "created_at": chat_message.created_at.isoformat(),
+        "reply_to_id": chat_message.reply_to_id,
+        "attachment_url": (
+            chat_message.attachment.url
+            if chat_message.attachment
+            else None
+        ),
+    }
+
+    # Send the event after the database transaction commits.
+    def broadcast_message():
+
+        async_to_sync(channel_layer.group_send)(
+            room_group_name,
+            {
+                "type": "chat.message",
+                "data": message_data,
+            },
+        )
+
+    transaction.on_commit(broadcast_message)
+
+    # ========================================
+    # RETURN JSON FOR AJAX REQUESTS
+    # ========================================
+
+    # JavaScript uses this response to confirm success.
+    if is_ajax:
+        return JsonResponse(
+            {
+                "success": True,
+                "message_id": chat_message.id,
+                "message": "Message sent successfully.",
+            },
+            status=201,
+        )
+
+    # ========================================
+    # RETURN TO GROUP CHAT
+    # ========================================
+
+    # Normal HTML form submissions still redirect.
     return redirect(
         reverse(
             "group_detail",
@@ -1192,9 +1280,21 @@ def send_group_message(request, group_id):
 @login_required
 @require_POST
 def edit_group_message(request, group_id, message_id):
-    """Allow a developer to edit their own text message."""
+    """Edit a message and broadcast the change through WebSockets."""
 
-    # Find the group or return 404.
+    # ========================================
+    # 1. CHECK IF REQUEST COMES FROM JAVASCRIPT
+    # ========================================
+
+    # AJAX requests receive JSON instead of redirects.
+    is_ajax = (
+        request.headers.get("X-Requested-With") == "XMLHttpRequest"
+    )
+
+    # ========================================
+    # 2. FIND THE GROUP
+    # ========================================
+
     group = get_object_or_404(
         ProjectGroup,
         id=group_id,
@@ -1206,21 +1306,38 @@ def edit_group_message(request, group_id, message_id):
             "You must be a group member to edit messages."
         )
 
-    # Find the message inside this group.
+    # ========================================
+    # 3. FIND THE MESSAGE
+    # ========================================
+
     chat_message = get_object_or_404(
         GroupChatMessage,
         id=message_id,
         group=group,
     )
 
-    # Only the original sender can edit the message.
+    # Only the sender can edit their message.
     if chat_message.sender_id != request.user.id:
         return HttpResponseForbidden(
             "You can only edit your own messages."
         )
 
-    # Only normal text messages can be edited for now.
+    # ========================================
+    # 4. CHECK MESSAGE TYPE
+    # ========================================
+
+    # Only text messages can be edited.
     if chat_message.message_type != "text":
+
+        if is_ajax:
+            return JsonResponse(
+                {
+                    "success": False,
+                    "error": "Only text messages can be edited.",
+                },
+                status=400,
+            )
+
         messages.error(
             request,
             "Only text messages can be edited.",
@@ -1233,14 +1350,27 @@ def edit_group_message(request, group_id, message_id):
             ) + "#group-chat"
         )
 
-    # Get the updated message from the submitted form.
+    # ========================================
+    # 5. VALIDATE THE NEW CONTENT
+    # ========================================
+
     new_content = request.POST.get(
         "content",
         "",
     ).strip()
 
-    # Prevent saving an empty message.
+    # Prevent empty messages.
     if not new_content:
+
+        if is_ajax:
+            return JsonResponse(
+                {
+                    "success": False,
+                    "error": "Your message cannot be empty.",
+                },
+                status=400,
+            )
+
         messages.error(
             request,
             "Your message cannot be empty.",
@@ -1253,29 +1383,87 @@ def edit_group_message(request, group_id, message_id):
             ) + "#group-chat"
         )
 
-    # Update the existing message.
+    # ========================================
+    # 6. UPDATE THE MESSAGE
+    # ========================================
+
+    # Replace the previous message content.
     chat_message.content = new_content
 
-    # Save only the changed field.
+    # Record when the message was edited.
+    chat_message.edited_at = timezone.now()
+
+    # Save both changed fields to PostgreSQL.
     chat_message.save(
-        update_fields=["content"],
+        update_fields=[
+            "content",
+            "edited_at",
+        ],
     )
 
-    # Confirm that the message was updated.
+    # ========================================
+    # 7. BROADCAST THE EDIT THROUGH WEBSOCKETS
+    # ========================================
+
+    # Get the Django Channels communication layer.
+    channel_layer = get_channel_layer()
+
+    # Use the same group name as consumers.py.
+    room_group_name = f"group_chat_{group.id}"
+
+    # Prepare the updated message information.
+    message_data = {
+        "type": "message_edited",
+        "message_id": chat_message.id,
+        "group_id": group.id,
+        "content": chat_message.content,
+        "edited_at": chat_message.edited_at.isoformat(),
+    }
+
+    # Broadcast only after the database transaction commits.
+    def broadcast_edit():
+
+        async_to_sync(channel_layer.group_send)(
+            room_group_name,
+            {
+                "type": "chat.message",
+                "data": message_data,
+            },
+        )
+
+    transaction.on_commit(broadcast_edit)
+
+    # ========================================
+    # 8. RETURN JSON FOR AJAX REQUESTS
+    # ========================================
+
+    if is_ajax:
+        return JsonResponse(
+            {
+                "success": True,
+                "message_id": chat_message.id,
+                "content": chat_message.content,
+                "edited_at": chat_message.edited_at.isoformat(),
+                "message": "Message updated successfully.",
+            },
+            status=200,
+        )
+
+    # ========================================
+    # 9. RETURN TO GROUP CHAT
+    # ========================================
+
     messages.success(
         request,
         "Message updated successfully.",
     )
 
-    # Return to Group Chat.
     return redirect(
         reverse(
             "group_detail",
             kwargs={"group_id": group.id},
         ) + "#group-chat"
     )
-
-
 # ============================================================
 # 17. EDIT GROUP CHAT MESSAGE
 # ============================================================
@@ -1347,13 +1535,24 @@ def edit_group_message(request, group_id, message_id):
 
 # ============================================================
 # 18. DELETE GROUP CHAT MESSAGE
-# ============================================================
-@login_required
+#@login_required
 @require_POST
 def delete_group_message(request, group_id, message_id):
-    """Permanently delete a developer's own group message."""
+    """Permanently delete a message and broadcast the deletion."""
 
-    # Find the group.
+    # ========================================
+    # 1. CHECK IF REQUEST COMES FROM JAVASCRIPT
+    # ========================================
+
+    # AJAX requests receive JSON instead of redirects.
+    is_ajax = (
+        request.headers.get("X-Requested-With") == "XMLHttpRequest"
+    )
+
+    # ========================================
+    # 2. FIND THE GROUP
+    # ========================================
+
     group = get_object_or_404(
         ProjectGroup,
         id=group_id,
@@ -1365,29 +1564,125 @@ def delete_group_message(request, group_id, message_id):
             "You must be a group member to delete messages."
         )
 
-    # Find the message inside this group.
+    # ========================================
+    # 3. FIND THE MESSAGE
+    # ========================================
+
     chat_message = get_object_or_404(
         GroupChatMessage,
         id=message_id,
         group=group,
     )
 
-    # Only the sender can delete their message.
+    # Only the original sender can delete the message.
     if chat_message.sender_id != request.user.id:
         return HttpResponseForbidden(
             "You can only delete your own messages."
         )
 
-    # Permanently remove the message from the database.
+    # ========================================
+    # 4. SAVE THE MESSAGE ID BEFORE DELETION
+    # ========================================
+
+    # We need this ID to tell connected browsers
+    # which message should disappear.
+    deleted_message_id = chat_message.id
+
+    # ========================================
+    # 5. DELETE THE MESSAGE
+    # ========================================
+
+    # Permanently remove the message from PostgreSQL.
     chat_message.delete()
 
-    # Show a success message.
+    # ========================================
+    # 6. BROADCAST DELETION THROUGH WEBSOCKETS
+    # ========================================
+
+    # Get the Django Channels communication layer.
+    channel_layer = get_channel_layer()
+
+    # Must match the group name in consumers.py.
+    room_group_name = f"group_chat_{group.id}"
+
+    # Prepare the deletion event.
+    message_data = {
+        "type": "message_deleted",
+        "message_id": deleted_message_id,
+        "group_id": group.id,
+    }
+
+    # Broadcast only after the database transaction commits.
+    def broadcast_deletion():
+
+        async_to_sync(channel_layer.group_send)(
+            room_group_name,
+            {
+                "type": "chat.message",
+                "data": message_data,
+            },
+        )
+
+    transaction.on_commit(broadcast_deletion)
+
+    # ========================================
+    # 7. RETURN JSON FOR AJAX REQUESTS
+    # ========================================
+
+    # JavaScript receives confirmation without reloading.
+    if is_ajax:
+        return JsonResponse(
+            {
+                "success": True,
+                "message_id": deleted_message_id,
+                "message": "Message deleted successfully.",
+            },
+            status=200,
+        )
+
+    # ========================================
+    # 8. RETURN TO GROUP CHAT
+    # ========================================
+
+    # Keep the original behavior for normal HTML forms.
     messages.success(
         request,
         "Message deleted successfully.",
     )
 
-    # Return to the new Group Chat interface.
     return redirect(
-        reverse("group_detail", args=[group_id]) + "#group-chat"
+        reverse(
+            "group_detail",
+            kwargs={"group_id": group.id},
+        ) + "#group-chat"
+    )
+    # Send the event after the database transaction commits.
+    def broadcast_deletion():
+        async_to_sync(channel_layer.group_send)(
+            room_group_name,
+            {
+                # Calls chat_message() inside consumers.py.
+                "type": "chat.message",
+
+                # Information sent to connected browsers.
+                "data": message_data,
+            },
+        )
+
+    transaction.on_commit(broadcast_deletion)
+
+    # ========================================
+    # 6. RETURN TO GROUP CHAT
+    # ========================================
+
+    messages.success(
+        request,
+        "Message deleted successfully.",
+    )
+
+    return redirect(
+        reverse(
+            "group_detail",
+            kwargs={"group_id": group.id},
+        ) + "#group-chat"
     )
