@@ -4,6 +4,9 @@ from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
+from django.urls import reverse
+from django.shortcuts import redirect
+
 from django.db.models import Q, Count
 from django.http import (
     HttpResponseForbidden,
@@ -1108,25 +1111,27 @@ def group_chat(request, group_id):
 @login_required
 @require_POST
 def send_group_message(request, group_id):
-    """Save a new group chat message."""
+    """Save a group message and return to the unified Group Chat."""
 
+    # Find the group or return 404.
     group = get_object_or_404(
         ProjectGroup,
         id=group_id,
     )
 
+    # Only group members can send messages.
     if not is_group_member(group, request.user):
-
         return HttpResponseForbidden(
             "You must be a group member to send messages."
         )
 
-    # request.FILES contains uploaded voice notes or attachments.
+    # Validate message content and uploaded attachments.
     form = GroupChatMessageForm(
         request.POST,
         request.FILES,
     )
 
+    # If validation fails, display an error.
     if not form.is_valid():
 
         messages.error(
@@ -1134,20 +1139,32 @@ def send_group_message(request, group_id):
             "Your message is invalid. Check the content or attachment.",
         )
 
+        # Return to the Group Chat tab.
         return redirect(
-            "group_chat",
-            group_id=group.id,
+            reverse(
+                "group_detail",
+                kwargs={"group_id": group.id},
+            ) + "#group-chat"
         )
 
+    # Create the message without saving it immediately.
     chat_message = form.save(commit=False)
 
-    # Assign protected information on the server.
+    # Assign the group and sender on the server.
     chat_message.group = group
     chat_message.sender = request.user
 
-    # Allow replies to existing messages in the same group.
-    reply_to_id = request.POST.get("reply_to_id", "").strip()
+    # ========================================
+    # HANDLE MESSAGE REPLIES
+    # ========================================
 
+    # Get the ID of the message being replied to.
+    reply_to_id = request.POST.get(
+        "reply_to_id",
+        "",
+    ).strip()
+
+    # If this message is a reply, find the original message.
     if reply_to_id:
 
         reply_to_message = get_object_or_404(
@@ -1158,11 +1175,104 @@ def send_group_message(request, group_id):
 
         chat_message.reply_to = reply_to_message
 
+    # Save the completed message.
     chat_message.save()
 
+    # ========================================
+    # RETURN TO THE UNIFIED GROUP CHAT
+    # ========================================
+
     return redirect(
-        "group_chat",
-        group_id=group.id,
+        reverse(
+            "group_detail",
+            kwargs={"group_id": group.id},
+        ) + "#group-chat"
+    )
+
+@login_required
+@require_POST
+def edit_group_message(request, group_id, message_id):
+    """Allow a developer to edit their own text message."""
+
+    # Find the group or return 404.
+    group = get_object_or_404(
+        ProjectGroup,
+        id=group_id,
+    )
+
+    # Only group members can edit messages.
+    if not is_group_member(group, request.user):
+        return HttpResponseForbidden(
+            "You must be a group member to edit messages."
+        )
+
+    # Find the message inside this group.
+    chat_message = get_object_or_404(
+        GroupChatMessage,
+        id=message_id,
+        group=group,
+    )
+
+    # Only the original sender can edit the message.
+    if chat_message.sender_id != request.user.id:
+        return HttpResponseForbidden(
+            "You can only edit your own messages."
+        )
+
+    # Only normal text messages can be edited for now.
+    if chat_message.message_type != "text":
+        messages.error(
+            request,
+            "Only text messages can be edited.",
+        )
+
+        return redirect(
+            reverse(
+                "group_detail",
+                kwargs={"group_id": group.id},
+            ) + "#group-chat"
+        )
+
+    # Get the updated message from the submitted form.
+    new_content = request.POST.get(
+        "content",
+        "",
+    ).strip()
+
+    # Prevent saving an empty message.
+    if not new_content:
+        messages.error(
+            request,
+            "Your message cannot be empty.",
+        )
+
+        return redirect(
+            reverse(
+                "group_detail",
+                kwargs={"group_id": group.id},
+            ) + "#group-chat"
+        )
+
+    # Update the existing message.
+    chat_message.content = new_content
+
+    # Save only the changed field.
+    chat_message.save(
+        update_fields=["content"],
+    )
+
+    # Confirm that the message was updated.
+    messages.success(
+        request,
+        "Message updated successfully.",
+    )
+
+    # Return to Group Chat.
+    return redirect(
+        reverse(
+            "group_detail",
+            kwargs={"group_id": group.id},
+        ) + "#group-chat"
     )
 
 
@@ -1238,55 +1348,46 @@ def edit_group_message(request, group_id, message_id):
 # ============================================================
 # 18. DELETE GROUP CHAT MESSAGE
 # ============================================================
-
 @login_required
 @require_POST
 def delete_group_message(request, group_id, message_id):
-    """Allow developers to soft-delete their own messages."""
+    """Permanently delete a developer's own group message."""
 
+    # Find the group.
     group = get_object_or_404(
         ProjectGroup,
         id=group_id,
     )
 
+    # Only group members can delete messages.
     if not is_group_member(group, request.user):
-
         return HttpResponseForbidden(
             "You must be a group member to delete messages."
         )
 
+    # Find the message inside this group.
     chat_message = get_object_or_404(
         GroupChatMessage,
         id=message_id,
         group=group,
     )
 
+    # Only the sender can delete their message.
     if chat_message.sender_id != request.user.id:
-
         return HttpResponseForbidden(
             "You can only delete your own messages."
         )
 
-    if chat_message.deleted_at is None:
+    # Permanently remove the message from the database.
+    chat_message.delete()
 
-        # Soft deletion preserves replies and conversation history.
-        chat_message.deleted_at = timezone.now()
-
-        # Remove message content from the active chat record.
-        chat_message.content = ""
-
-        # Clear attachment references from the message.
-        # Physical file cleanup will be handled separately.
-        chat_message.attachment = ""
-
-        chat_message.save()
-
+    # Show a success message.
     messages.success(
         request,
         "Message deleted successfully.",
     )
 
+    # Return to the new Group Chat interface.
     return redirect(
-        "group_chat",
-        group_id=group.id,
+        reverse("group_detail", args=[group_id]) + "#group-chat"
     )

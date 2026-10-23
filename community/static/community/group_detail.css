@@ -675,29 +675,6 @@ body {
     flex-shrink: 0;
 }
 
-/* Message type and language controls. */
-#group-chat .composer-options {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 15px;
-    margin-bottom: 12px;
-}
-
-#group-chat .composer-options label {
-    color: #9ca3af;
-    font-size: 12px;
-}
-
-#group-chat .composer-options select,
-#group-chat .composer-options input {
-    max-width: 180px;
-    padding: 7px;
-    background: #26282d;
-    border: 1px solid #41434a;
-    border-radius: 6px;
-    color: #ffffff;
-}
 
 /* Main message input box. */
 #group-chat .composer-box {
@@ -801,12 +778,160 @@ body {
         max-width: 100%;
     }
 
-    #group-chat .composer-options {
-        gap: 10px;
+
+}
+
+/* ==========================================
+   19. SIMPLE CHAT COMPOSER
+========================================== */
+
+/* Hide the actual file input from the interface. */
+#group-chat .composer-file-input {
+    display: none;
+}
+
+/* Style the attachment button. */
+#group-chat #attach-file-button {
+    background: transparent;
+    font-size: 22px;
+}
+
+#group-chat #attach-file-button:hover {
+    background: #383b42;
+}
+
+/* Display the name of the selected file. */
+#group-chat .selected-file-name {
+    margin: 10px 0 0;
+    color: #86efac;
+    font-size: 12px;
+    overflow-wrap: anywhere;
+}
+
+/* Highlight the message box when typing. */
+#group-chat .composer-box:focus-within {
+    border-color: #16a34a;
+}
+
+/* Keep the message input comfortable on smaller screens. */
+@media (max-width: 750px) {
+
+    #group-chat .composer-box {
+        gap: 8px;
     }
 
-    #group-chat .composer-options select,
-    #group-chat .composer-options input {
-        max-width: 140px;
+    #group-chat .composer-button {
+        width: 35px;
+        height: 35px;
     }
+
+    #group-chat .composer-textarea {
+        padding: 9px 4px;
+    }
+}
+
+
+
+/* ==========================================
+   20. DARK MESSAGE EDIT AND DELETE PANELS
+   Matches the CodeView workspace colors.
+========================================== */
+
+/* Hide inactive panels even if another style defines display. */
+#group-chat .message-edit-form[hidden],
+#group-chat .message-delete-form[hidden] {
+    display: none !important;
+}
+
+#group-chat .message-edit-form,
+#group-chat .message-delete-form {
+    margin-top: 12px;
+    padding: 15px;
+    background: #202227;
+    color: #e7e9ed;
+    border: 1px solid #353942;
+    border-radius: 10px;
+}
+
+/* Match the dark chat composer rather than browser-white inputs. */
+#group-chat .message-edit-input {
+    display: block;
+    width: 100%;
+    min-height: 85px;
+    padding: 12px;
+    background: #17191d;
+    color: #f4f5f7;
+    border: 1px solid #414650;
+    border-radius: 8px;
+    font: inherit;
+    line-height: 1.5;
+    resize: vertical;
+}
+
+#group-chat .message-edit-input:focus {
+    outline: none;
+    border-color: #22c76a;
+    box-shadow: 0 0 0 3px rgba(34, 199, 106, 0.15);
+}
+
+#group-chat .message-edit-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 12px;
+}
+
+#group-chat .edit-save-button,
+#group-chat .edit-cancel-button,
+#group-chat .delete-confirm-button,
+#group-chat .delete-cancel-button {
+    padding: 9px 16px;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+#group-chat .edit-save-button {
+    background: #159a51;
+    color: #fff;
+}
+
+#group-chat .edit-cancel-button,
+#group-chat .delete-cancel-button {
+    background: #32363e;
+    color: #e5e7eb;
+    border-color: #474c55;
+}
+
+#group-chat .delete-confirm-button {
+    background: #b73540;
+    color: #fff;
+}
+
+#group-chat .edit-save-button:hover,
+#group-chat .edit-cancel-button:hover,
+#group-chat .delete-confirm-button:hover,
+#group-chat .delete-cancel-button:hover {
+    filter: brightness(1.12);
+}
+
+#group-chat .message-delete-form p {
+    margin: 0;
+    color: #f0d4d7;
+}
+
+#group-chat .message-deleted {
+    color: #9da3ae;
+    font-style: italic;
+}
+
+/* Hidden attachment field is triggered by the paperclip button. */
+#group-chat .composer-file-input {
+    display: none !important;
+}
+
+#group-chat .selected-file-name[hidden] {
+    display: none !important;
 }

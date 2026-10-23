@@ -733,259 +733,288 @@
 
         </header>
 
+<!-- ====================================
+     CHAT MESSAGE HISTORY
+     Display messages from group members.
+==================================== -->
 
-        <!-- ====================================
-             CHAT MESSAGE HISTORY
-        ==================================== -->
+<div
+    class="chat-messages"
+    id="chat-messages"
+    aria-label="Group chat messages"
+>
 
-        <div
-            class="chat-messages"
-            id="chat-messages"
-            aria-label="Group chat messages"
+    {% for chat_message in chat_messages %}
+
+        <article
+            class="chat-message"
+            id="message-{{ chat_message.id }}"
         >
 
-            {% for chat_message in chat_messages %}
+            <!-- ====================================
+                 SENDER AVATAR
+            ==================================== -->
 
-                <article
-                    class="chat-message"
-                    id="message-{{ chat_message.id }}"
-                >
+            <div class="message-avatar">
+                {{ chat_message.sender.username|first|upper }}
+            </div>
 
-                    <!-- Sender avatar. -->
-                    <div class="message-avatar">
-                        {{ chat_message.sender.username|first|upper }}
+            <div class="message-body">
+
+                <!-- ====================================
+                     SENDER INFORMATION
+                ==================================== -->
+
+                <div class="message-header">
+
+                    <strong class="message-author">
+                        {{ chat_message.sender.username }}
+                    </strong>
+
+                    <time class="message-time">
+                        {{ chat_message.created_at|date:"M d, Y - H:i" }}
+                    </time>
+
+                </div>
+
+
+                <!-- ====================================
+                     REPLY PREVIEW
+                     Show the original message.
+                ==================================== -->
+
+                {% if chat_message.reply_to %}
+
+                    <div class="message-reply">
+
+                        ↳ Replying to
+
+                        <strong>
+                            {{ chat_message.reply_to.sender.username }}
+                        </strong>
+
+                        {% if chat_message.reply_to.content %}
+
+                            <p>
+                                {{ chat_message.reply_to.content|truncatechars:100 }}
+                            </p>
+
+                        {% endif %}
+
                     </div>
 
-                    <div class="message-body">
-
-                        <!-- Sender information. -->
-                        <div class="message-header">
-
-                            <strong class="message-author">
-                                {{ chat_message.sender.username }}
-                            </strong>
-
-                            <time class="message-time">
-                                {{ chat_message.created_at|date:"M d, Y - H:i" }}
-                            </time>
-
-                        </div>
+                {% endif %}
 
 
-                        <!-- REPLY PREVIEW -->
+                <!-- ====================================
+                     TEXT MESSAGES
+                     Normal group conversations.
+                ==================================== -->
 
-                        {% if chat_message.reply_to %}
+                {% if chat_message.message_type == "text" %}
 
-                            <div class="message-reply">
+                    <div class="message-content">
+                        {{ chat_message.content|linebreaksbr }}
+                    </div>
 
-                                ↳ Replying to
-
-                                <strong>
-                                    {{ chat_message.reply_to.sender.username }}
-                                </strong>
-
-                                {% if chat_message.reply_to.content %}
-
-                                    <p>
-                                        {{ chat_message.reply_to.content|truncatechars:100 }}
-                                    </p>
-
-                                {% endif %}
-
-                            </div>
-
-                        {% endif %}
+                {% endif %}
 
 
-                        <!-- TEXT MESSAGE -->
+                <!-- ====================================
+                     EXISTING CODE MESSAGES
+                     Keep older code messages visible.
+                     No language selector is required.
+                ==================================== -->
 
+                {% if chat_message.message_type == "code" %}
+
+                    <pre class="message-code"><code>{{ chat_message.content }}</code></pre>
+
+                {% endif %}
+
+
+                <!-- ====================================
+                     VOICE MESSAGES
+                     Play previously uploaded audio.
+                ==================================== -->
+
+                {% if chat_message.message_type == "voice" %}
+
+                    {% if chat_message.attachment %}
+
+                        <audio
+                            controls
+                            preload="none"
+                            class="message-audio"
+                            src="{{ chat_message.attachment.url }}"
+                        ></audio>
+
+                    {% endif %}
+
+                    {% if chat_message.content %}
+
+                        <p class="message-content">
+                            {{ chat_message.content|linebreaksbr }}
+                        </p>
+
+                    {% endif %}
+
+                {% endif %}
+
+
+                <!-- ====================================
+                     FILE MESSAGES
+                     Show message and attachment.
+                ==================================== -->
+
+                {% if chat_message.message_type == "file" %}
+
+                    {% if chat_message.content %}
+
+                        <p class="message-content">
+                            {{ chat_message.content|linebreaksbr }}
+                        </p>
+
+                    {% endif %}
+
+                    {% if chat_message.attachment %}
+
+                        <a
+                            href="{{ chat_message.attachment.url }}"
+                            class="message-attachment"
+                            download
+                        >
+                            📎 Download Attachment
+                        </a>
+
+                    {% endif %}
+
+                {% endif %}
+
+
+                <!-- ====================================
+                     MESSAGE ACTIONS AND FORMS
+                ==================================== -->
+
+                <div class="message-actions">
+                    <button
+                        type="button"
+                        class="reply-button"
+                        data-message-id="{{ chat_message.id }}"
+                        data-sender="{{ chat_message.sender.username }}"
+                    >↩ Reply</button>
+
+                    {% if chat_message.sender_id == request.user.id %}
                         {% if chat_message.message_type == "text" %}
-
-                            <div class="message-content">
-                                {{ chat_message.content|linebreaksbr }}
-                            </div>
-
-                        {% endif %}
-
-
-                        <!-- CODE MESSAGE -->
-
-                        {% if chat_message.message_type == "code" %}
-
-                            {% if chat_message.code_language %}
-
-                                <div class="code-language">
-                                    {{ chat_message.code_language }}
-                                </div>
-
-                            {% endif %}
-
-                            <pre class="message-code"><code>{{ chat_message.content }}</code></pre>
-
-                        {% endif %}
-
-
-                        <!-- VOICE MESSAGE -->
-
-                        {% if chat_message.message_type == "voice" %}
-
-                            {% if chat_message.attachment %}
-
-                                <audio
-                                    controls
-                                    preload="none"
-                                    class="message-audio"
-                                    src="{{ chat_message.attachment.url }}"
-                                ></audio>
-
-                            {% endif %}
-
-                            {% if chat_message.content %}
-
-                                <p class="message-content">
-                                    {{ chat_message.content }}
-                                </p>
-
-                            {% endif %}
-
-                        {% endif %}
-
-
-                        <!-- FILE MESSAGE -->
-
-                        {% if chat_message.message_type == "file" %}
-
-                            {% if chat_message.content %}
-
-                                <p class="message-content">
-                                    {{ chat_message.content|linebreaksbr }}
-                                </p>
-
-                            {% endif %}
-
-                            {% if chat_message.attachment %}
-
-                                <a
-                                    href="{{ chat_message.attachment.url }}"
-                                    class="message-attachment"
-                                    download
-                                >
-                                    📎 Download Attachment
-                                </a>
-
-                            {% endif %}
-
-                        {% endif %}
-
-
-                        <!-- ====================================
-                             MESSAGE ACTIONS
-                        ==================================== -->
-
-                        <div class="message-actions">
-
-                            <!-- Reply to any message. -->
                             <button
                                 type="button"
-                                class="reply-button"
+                                class="edit-button"
                                 data-message-id="{{ chat_message.id }}"
-                                data-sender="{{ chat_message.sender.username }}"
-                            >
-                                ↩ Reply
-                            </button>
+                            >✏️ Edit</button>
+                        {% endif %}
 
-                            <!-- Only the sender sees these actions. -->
-                            {% if chat_message.sender_id == request.user.id %}
+                        <button
+                            type="button"
+                            class="delete-button"
+                            data-message-id="{{ chat_message.id }}"
+                        >🗑 Delete</button>
+                    {% endif %}
+                </div>
 
-                                <button
-                                    type="button"
-                                    class="edit-button"
-                                    data-message-id="{{ chat_message.id }}"
-                                >
-                                    ✏️ Edit
-                                </button>
+                {% if chat_message.sender_id == request.user.id %}
+                    <!-- Edit only normal text messages. -->
+                    {% if chat_message.message_type == "text" %}
+                        <form
+                            method="POST"
+                            action="{% url 'edit_group_message' group.id chat_message.id %}"
+                            class="message-edit-form"
+                            id="edit-form-{{ chat_message.id }}"
+                            hidden
+                        >
+                            {% csrf_token %}
+                            <textarea
+                                name="content"
+                                class="message-edit-input"
+                                rows="3"
+                                required
+                            >{{ chat_message.content }}</textarea>
+                            <div class="message-edit-actions">
+                                <button type="submit" class="edit-save-button">Save</button>
+                                <button type="button" class="edit-cancel-button">Cancel</button>
+                            </div>
+                        </form>
+                    {% endif %}
 
-                                <button
-                                    type="button"
-                                    class="delete-button"
-                                    data-message-id="{{ chat_message.id }}"
-                                >
-                                    🗑 Delete
-                                </button>
-
-                            {% endif %}
-
+                    <!-- Confirm deletion before sending the POST request. -->
+                    <form
+                        method="POST"
+                        action="{% url 'delete_group_message' group.id chat_message.id %}"
+                        class="message-delete-form"
+                        id="delete-form-{{ chat_message.id }}"
+                        hidden
+                    >
+                        {% csrf_token %}
+                        <p>Are you sure you want to delete this message?</p>
+                        <div class="message-edit-actions">
+                            <button type="submit" class="delete-confirm-button">Yes, Delete</button>
+                            <button type="button" class="delete-cancel-button">Cancel</button>
                         </div>
+                    </form>
+                {% endif %}
 
-                    </div>
+            </div>
 
-                </article>
+        </article>
 
-            {% empty %}
+    {% empty %}
 
-                <p class="chat-empty">
-                    No messages yet. Start the conversation!
-                </p>
+        <!-- Display when the group has no messages. -->
+        <p class="chat-empty">
+            No messages yet. Start the conversation!
+        </p>
 
-            {% endfor %}
+    {% endfor %}
 
-        </div>
+</div>
+
 
 
         <!-- ====================================
-             CHAT MESSAGE COMPOSER
+             SIMPLE CHAT MESSAGE COMPOSER
+             No visible Type or Language fields.
         ==================================== -->
 
         <div class="chat-composer">
-
             <form
                 method="POST"
                 action="{% url 'send_group_message' group.id %}"
                 enctype="multipart/form-data"
                 id="chat-form"
             >
-
                 {% csrf_token %}
 
-                <!-- Display form validation errors. -->
+                <!-- JavaScript changes text to file when needed. -->
+                <input type="hidden" name="message_type" value="text">
+                <input type="hidden" name="reply_to_id" id="reply-to-id" value="">
+
                 {% if chat_form.errors %}
-
-                    <div class="composer-error">
-                        {{ chat_form.errors }}
-                    </div>
-
+                    <div class="composer-error">{{ chat_form.errors }}</div>
                 {% endif %}
 
-
-                <!-- MESSAGE OPTIONS -->
-
-                <div class="composer-options">
-
-                    <label for="{{ chat_form.message_type.id_for_label }}">
-                        Type
-                    </label>
-
-                    {{ chat_form.message_type }}
-
-                    <label for="{{ chat_form.code_language.id_for_label }}">
-                        Language
-                    </label>
-
-                    {{ chat_form.code_language }}
-
-                </div>
-
-
-                <!-- MESSAGE INPUT -->
-
                 <div class="composer-box">
+                    <button
+                        type="button"
+                        class="composer-button"
+                        id="attach-file-button"
+                        title="Attach a file"
+                        aria-label="Attach a file"
+                    >📎</button>
 
-                    <!-- File attachment. -->
-                    <div class="composer-file-input">
+                    <!-- Keep the Django file input in the form, but hide it. -->
+                    <div class="composer-file-input" hidden>
                         {{ chat_form.attachment }}
                     </div>
 
-                    <!-- Message content. -->
                     <textarea
                         name="content"
                         id="id_content"
@@ -994,32 +1023,23 @@
                         placeholder="Message #{{ group.name }}"
                     >{{ chat_form.content.value|default_if_none:"" }}</textarea>
 
-
-                    <!-- Voice recording: future feature. -->
                     <button
                         type="button"
                         class="composer-button"
                         id="record-voice-button"
-                        title="Record voice note (coming soon)"
+                        title="Voice notes coming soon"
                         disabled
-                    >
-                        🎤
-                    </button>
+                    >🎤</button>
 
-
-                    <!-- Send message. -->
                     <button
                         type="submit"
                         class="composer-button composer-send"
                         title="Send message"
-                    >
-                        ➤
-                    </button>
-
+                    >➤</button>
                 </div>
 
+                <p class="selected-file-name" id="selected-file-name" hidden></p>
             </form>
-
         </div>
 
     </section>
@@ -1118,6 +1138,12 @@
 <!-- New workspace navigation. -->
 <script
     src="{% static 'community/group_workspace.js' %}"
+    defer
+></script>
+
+<!-- Group Chat attachments and replies. -->
+<script
+    src="{% static 'community/group_chat.js' %}"
     defer
 ></script>
 
