@@ -675,30 +675,109 @@ function handleEditedMessage(data) {
         });
     }
 
-    // ========================================
-    // 8. REPLY TO MESSAGES
-    // ========================================
+   // ========================================
+// 8. REPLY TO MESSAGES
+// ========================================
 
-    chatMessages.addEventListener("click", function (event) {
+// Find the existing reply preview elements in the HTML.
+const replyPreview = document.getElementById("chat-reply-preview");
+const replyPreviewSender = document.getElementById("reply-preview-sender");
+const replyPreviewContent = document.getElementById("reply-preview-content");
 
-        const button = event.target.closest(".reply-button");
+// Find the Cancel Reply button.
+const cancelReplyButton = document.querySelector(
+    "#chat-reply-preview button"
+);
 
-        if (!button) {
-            return;
-        }
+// Reset the reply form to its normal state.
+function clearReply() {
 
-        if (replyToInput) {
-            replyToInput.value = button.dataset.messageId;
-        }
+    // Remove the ID of the message being replied to.
+    if (replyToInput) {
+        replyToInput.value = "";
+    }
 
+    // Hide the reply preview.
+    if (replyPreview) {
+        replyPreview.hidden = true;
+    }
+
+    // Clear the previous reply details.
+    if (replyPreviewSender) {
+        replyPreviewSender.textContent = "";
+    }
+
+    if (replyPreviewContent) {
+        replyPreviewContent.textContent = "";
+    }
+
+    // Restore the normal message placeholder.
+    if (messageInput) {
+        messageInput.placeholder = "Type a message...";
+    }
+}
+
+// Allow the user to cancel a reply.
+if (cancelReplyButton) {
+    cancelReplyButton.addEventListener("click", function (event) {
+
+        // Prevent accidental form submission.
+        event.preventDefault();
+
+        // Cancel the reply.
+        clearReply();
+
+        // Return focus to the message input.
         if (messageInput) {
-
-            messageInput.placeholder =
-                "Replying to " + button.dataset.sender + "...";
-
             messageInput.focus();
         }
     });
+}
+// Listen for clicks on Reply buttons.
+chatMessages.addEventListener("click", function (event) {
+
+    // Identify the Reply button that was clicked.
+    const button = event.target.closest(".reply-button");
+
+    if (!button) {
+        return;
+    }
+
+    // Store the ID of the message being replied to.
+    if (replyToInput) {
+        replyToInput.value = button.dataset.messageId;
+    }
+
+    // Find the original message in the chat.
+    const originalMessage = findMessage(button.dataset.messageId);
+
+    // Get the original message's text.
+    const originalContent = originalMessage
+        ? originalMessage.querySelector(".chat-message-content, .message-content")
+        : null;
+
+    // Display the original sender and message.
+    if (replyPreview && replyPreviewSender && replyPreviewContent) {
+
+        replyPreviewSender.textContent =
+            "Replying to " + (button.dataset.sender || "Developer");
+
+        replyPreviewContent.textContent = originalContent
+            ? originalContent.textContent.trim()
+            : "Original message";
+
+        // Make the preview visible.
+        replyPreview.hidden = false;
+    }
+
+    // Focus the message input.
+    if (messageInput) {
+        messageInput.placeholder =
+            "Replying to " + (button.dataset.sender || "Developer") + "...";
+
+        messageInput.focus();
+    }
+});
 
     // ========================================
     // 9. SEND MESSAGES WITHOUT REFRESHING
@@ -735,19 +814,19 @@ function handleEditedMessage(data) {
 
         try {
 
-            await submitForm(chatForm);
+           // Send the message and wait for the server to confirm success.
+          await submitForm(chatForm);
 
-            // Clear the composer after successful submission.
+            // Reset the message form.
             chatForm.reset();
 
-            if (replyToInput) {
-                replyToInput.value = "";
-            }
+            // Clear the reply ID and hide the reply preview.
+            clearReply();
 
+            // Restore the normal message placeholder.
             if (messageInput) {
-                messageInput.placeholder =
-                    `Message #${groupId}`;
-            }
+            messageInput.placeholder = `Message #${groupId}`;
+}
 
             if (fileNameDisplay) {
                 fileNameDisplay.textContent = "";
