@@ -491,30 +491,48 @@ def membership_requests(request, group_id):
     # ============================================================
 # ADD GROUP MEMBER
 # ============================================================
-
 @login_required
 @require_POST
 def add_group_member(request, group_id):
     """Allow group administrators to add registered developers."""
+
+    # Redirect back to the Members section.
+    members_url = (
+        reverse("group_detail", kwargs={"group_id": group_id})
+        + "#group-members"
+    )
+
+    # Check administrator permission before searching for users.
+    group = get_object_or_404(ProjectGroup, id=group_id)
+
+    is_admin = GroupMember.objects.filter(
+        group=group,
+        user=request.user,
+        role="admin",
+    ).exists()
+
+    if not is_admin:
+        return HttpResponseForbidden(
+            "Only group administrators can add members."
+        )
 
     # Validate the submitted username.
     form = AddGroupMemberForm(request.POST)
 
     if not form.is_valid():
         messages.error(request, "Please enter a valid username.")
-        return redirect("group_detail", group_id=group_id)
-
-    # Get the project's configured user model.
-    User = get_user_model()
+        return redirect(members_url)
 
     # Find the developer by username.
+    User = get_user_model()
+
     developer = User.objects.filter(
         username=form.cleaned_data["username"]
     ).first()
 
     if developer is None:
         messages.error(request, "Developer not found.")
-        return redirect("group_detail", group_id=group_id)
+        return redirect(members_url)
 
     # Perform membership checks and changes together.
     with transaction.atomic():
@@ -525,7 +543,7 @@ def add_group_member(request, group_id):
             id=group_id,
         )
 
-        # Only group administrators can add developers.
+        # Recheck administrator permission while holding the lock.
         is_admin = GroupMember.objects.filter(
             group=group,
             user=request.user,
@@ -543,9 +561,9 @@ def add_group_member(request, group_id):
                 request,
                 "Invitation-only groups require an accepted invitation."
             )
-            return redirect("group_detail", group_id=group_id)
+            return redirect(members_url)
 
-        # Prevent adding the same developer twice.
+        # Prevent duplicate membership.
         if GroupMember.objects.filter(
             group=group,
             user=developer,
@@ -554,9 +572,9 @@ def add_group_member(request, group_id):
                 request,
                 "This developer is already a group member."
             )
-            return redirect("group_detail", group_id=group_id)
+            return redirect(members_url)
 
-        # Check the private group's membership limit.
+        # Enforce private group membership limit.
         if group.is_private:
             member_count = GroupMember.objects.filter(
                 group=group
@@ -567,7 +585,7 @@ def add_group_member(request, group_id):
                     request,
                     "Private groups cannot exceed 10 members."
                 )
-                return redirect("group_detail", group_id=group_id)
+                return redirect(members_url)
 
         # Create the membership.
         try:
@@ -581,27 +599,28 @@ def add_group_member(request, group_id):
                 request,
                 "Unable to add this developer to the group."
             )
-            return redirect("group_detail", group_id=group_id)
+            return redirect(members_url)
 
     messages.success(
         request,
         f"{developer.username} was added successfully!"
     )
 
-    return redirect("group_detail", group_id=group_id)
-
-# ============================================================
-# SEARCH REGISTERED DEVELOPERS
-# ============================================================
-
+    # Stay on the Members section.
+    return redirect(members_url)
 # ============================================================
 # GROUP MEMBERSHIP MANAGEMENT
 # ============================================================
-
 @login_required
 @require_POST
 def remove_group_member(request, group_id, member_id):
     """Allow authorized administrators to remove group members."""
+
+    # Redirect back to the Members section.
+    members_url = (
+        reverse("group_detail", kwargs={"group_id": group_id})
+        + "#group-members"
+    )
 
     with transaction.atomic():
 
@@ -652,8 +671,8 @@ def remove_group_member(request, group_id, member_id):
         f"{username} was removed from the group."
     )
 
-    return redirect("group_detail", group_id=group_id)
-
+    # Stay on the Members section.
+    return redirect(members_url)
 
 @login_required
 @require_POST
@@ -702,8 +721,11 @@ def change_group_member_role(request, group_id, member_id):
         f"{target.user.username} is now a group {new_role}."
     )
 
-    return redirect("group_detail", group_id=group_id)
-
+    # Return to the Members tab after promoting or demoting.
+    return redirect(
+        reverse("group_detail", kwargs={"group_id": group_id})
+        + "#group-members"
+    )
 
 @login_required
 @require_POST

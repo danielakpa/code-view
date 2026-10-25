@@ -175,8 +175,7 @@
                  5. ADMINISTRATOR NAVIGATION
             ==================================== -->
 
-            {% if is_admin %}
-
+{% if is_admin and group.join_policy == "approval" %}
                 <div class="sidebar-divider"></div>
 
                 <div class="sidebar-admin-title">
@@ -1154,19 +1153,19 @@
                 <!-- Owner can remove admins and members.
                      Admins can remove ordinary members only. -->
                 {% if request.user.id == group.owner_id or membership.role == "member" %}
+<!-- Remove developer form -->
+<form
+    method="POST"
+    action="{% url 'remove_group_member' group.id membership.id %}"
+    class="remove-member-form"
+>
+    {% csrf_token %}
 
-                    <form
-                        method="POST"
-                        action="{% url 'remove_group_member' group.id membership.id %}"
-                        onsubmit="return confirm('Remove this developer from the group?');"
-                    >
-                        {% csrf_token %}
-
-                        <button type="submit" class="member-remove-btn">
-                            Remove
-                        </button>
-
-                    </form>
+    <!-- Open the custom confirmation modal -->
+    <button type="submit" class="member-remove-btn">
+        Remove
+    </button>
+</form>
 
                 {% endif %}
 
@@ -1189,18 +1188,17 @@
 
     <div class="leave-group-section">
 
-        <form
-            method="POST"
-            action="{% url 'leave_group' group.id %}"
-            onsubmit="return confirm('Are you sure you want to leave this group?');"
-        >
-            {% csrf_token %}
+       <form
+    method="POST"
+    action="{% url 'leave_group' group.id %}"
+    class="leave-group-form"
+>
+    {% csrf_token %}
 
-            <button type="submit" class="leave-group-btn">
-                Leave Group
-            </button>
-
-        </form>
+    <button type="submit" class="leave-group-btn">
+        Leave Group
+    </button>
+</form>
 
     </div>
 
@@ -1262,6 +1260,102 @@
         </main>
 
     </div>
+    <!-- ========================================
+     REMOVE DEVELOPER CONFIRMATION MODAL
+======================================== -->
+
+<div
+    id="remove-member-modal"
+    class="codeview-modal"
+    hidden
+>
+    <div class="codeview-modal-overlay"></div>
+
+    <div
+        class="codeview-modal-content"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="remove-modal-title"
+        aria-describedby="remove-modal-description"
+    >
+
+        <h2 id="remove-modal-title">
+            Remove Developer?
+        </h2>
+
+        <p id="remove-modal-description">
+            Are you sure you want to remove this developer from the group?
+        </p>
+
+        <div class="codeview-modal-actions">
+
+            <button
+                type="button"
+                id="cancel-remove-member"
+                class="modal-cancel-btn"
+            >
+                Cancel
+            </button>
+
+            <button
+                type="button"
+                id="confirm-remove-member"
+                class="modal-remove-btn"
+            >
+                Remove Member
+            </button>
+
+        </div>
+
+    </div>
+</div>
+<!-- ========================================
+     LEAVE GROUP CONFIRMATION MODAL
+======================================== -->
+
+<div id="leave-group-modal" class="codeview-modal" hidden>
+
+    <div class="codeview-modal-overlay"></div>
+
+    <div
+        class="codeview-modal-content"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="leave-modal-title"
+        aria-describedby="leave-modal-description"
+    >
+
+        <h2 id="leave-modal-title">
+            Leave Group?
+        </h2>
+
+        <p id="leave-modal-description">
+            Are you sure you want to leave this group?
+            You will lose access to member-only features.
+        </p>
+
+        <div class="codeview-modal-actions">
+
+            <button
+                type="button"
+                id="cancel-leave-group"
+                class="modal-cancel-btn"
+            >
+                Cancel
+            </button>
+
+            <button
+                type="button"
+                id="confirm-leave-group"
+                class="modal-remove-btn"
+            >
+                Leave Group
+            </button>
+
+        </div>
+
+    </div>
+</div>
 
 
     <!-- ========================================

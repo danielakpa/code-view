@@ -209,4 +209,170 @@ document.addEventListener("DOMContentLoaded", function () {
 
     switchTab(getTabFromURL());
 
-});
+
+
+    // ========================================
+    // REMOVE DEVELOPER CONFIRMATION MODAL
+    // ========================================
+
+    // Find the modal and its buttons.
+    const removeModal = document.getElementById("remove-member-modal");
+
+    const cancelRemoveButton = document.getElementById(
+        "cancel-remove-member"
+    );
+
+    const confirmRemoveButton = document.getElementById(
+        "confirm-remove-member"
+    );
+
+    // Store the form belonging to the selected developer.
+    let selectedRemoveForm = null;
+
+    if (removeModal && cancelRemoveButton && confirmRemoveButton) {
+
+        // Find every Remove Member form.
+        const removeForms = document.querySelectorAll(
+            ".remove-member-form"
+        );
+
+        // Open the modal when a Remove button is clicked.
+        removeForms.forEach(function (form) {
+
+            form.addEventListener("submit", function (event) {
+
+                // Stop the form from submitting immediately.
+                event.preventDefault();
+
+                // Remember which developer should be removed.
+                selectedRemoveForm = form;
+
+                // Display the confirmation modal.
+                removeModal.hidden = false;
+
+                // Move keyboard focus into the modal.
+                cancelRemoveButton.focus();
+
+            });
+
+        });
+
+        // Close the modal without removing the developer.
+        function closeRemoveModal() {
+
+            removeModal.hidden = true;
+
+            // Clear the selected form.
+            selectedRemoveForm = null;
+
+        }
+
+        // Cancel removal.
+        cancelRemoveButton.addEventListener("click", function () {
+            closeRemoveModal();
+        });
+
+        // Confirm removal.
+        confirmRemoveButton.addEventListener("click", function () {
+
+            if (selectedRemoveForm) {
+
+                // Submit the original Django form.
+                // This includes its CSRF token.
+                selectedRemoveForm.submit();
+
+            }
+
+        });
+
+        // Close the modal when clicking outside its content.
+        const modalOverlay = removeModal.querySelector(
+            ".codeview-modal-overlay"
+        );
+
+        if (modalOverlay) {
+
+            modalOverlay.addEventListener("click", function () {
+                closeRemoveModal();
+            });
+
+        }
+
+        // Close the modal when Escape is pressed.
+        document.addEventListener("keydown", function (event) {
+
+            if (event.key === "Escape" && !removeModal.hidden) {
+                closeRemoveModal();
+            }
+
+        });
+
+    }
+
+            // ========================================
+    // LEAVE GROUP CONFIRMATION MODAL
+    // ========================================
+
+    // Find the Leave Group form and modal.
+    const leaveForm = document.querySelector(".leave-group-form");
+
+    const leaveModal = document.getElementById("leave-group-modal");
+
+    const cancelLeaveButton = document.getElementById(
+        "cancel-leave-group"
+    );
+
+    const confirmLeaveButton = document.getElementById(
+        "confirm-leave-group"
+    );
+
+    if (leaveForm && leaveModal && cancelLeaveButton && confirmLeaveButton) {
+
+        // Open the modal when the developer clicks Leave Group.
+        leaveForm.addEventListener("submit", function (event) {
+
+            // Stop the form from submitting immediately.
+            event.preventDefault();
+
+            // Display the custom modal.
+            leaveModal.hidden = false;
+
+            // Move keyboard focus into the modal.
+            cancelLeaveButton.focus();
+        });
+
+        // Close the modal without leaving the group.
+        function closeLeaveModal() {
+            leaveModal.hidden = true;
+        }
+
+        // Cancel leaving.
+        cancelLeaveButton.addEventListener("click", closeLeaveModal);
+
+        // Confirm leaving.
+        confirmLeaveButton.addEventListener("click", function () {
+
+            // Submit the original Django form with its CSRF token.
+            leaveForm.submit();
+        });
+
+        // Close the modal when clicking outside.
+        const leaveOverlay = leaveModal.querySelector(
+            ".codeview-modal-overlay"
+        );
+
+        if (leaveOverlay) {
+            leaveOverlay.addEventListener("click", closeLeaveModal);
+        }
+        // Close the modal when Escape is pressed.
+        document.addEventListener("keydown", function (event) {
+
+            if (event.key === "Escape" && !leaveModal.hidden) {
+                closeLeaveModal();
+            }
+
+        });
+
+    } // End of Leave Group confirmation modal.
+
+}); // End of DOMContentLoaded.

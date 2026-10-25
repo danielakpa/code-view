@@ -1153,3 +1153,99 @@ body {
 .leave-group-btn:hover {
     background: #3b2025;
 }
+/* ========================================
+   CODEVIEW REMOVE MEMBER MODAL
+======================================== */
+
+.codeview-modal[hidden] {
+    display: none !important;
+}
+
+.codeview-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    padding: 20px;
+}
+
+.codeview-modal-overlay {
+    position: absolute;
+    inset: 0;
+
+    background: rgba(0, 0, 0, 0.75);
+}
+
+.codeview-modal-content {
+    position: relative;
+    z-index: 1;
+
+    width: 100%;
+    max-width: 420px;
+
+    background: #15191f;
+    border: 1px solid #30363d;
+    border-radius: 14px;
+
+    padding: 28px;
+
+    color: #e6edf3;
+
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+.codeview-modal-content h2 {
+    margin: 0 0 14px;
+    font-size: 22px;
+    font-weight: 600;
+}
+
+.codeview-modal-content p {
+    margin: 0;
+    color: #9ca3af;
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+.codeview-modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+
+    margin-top: 28px;
+}
+
+.modal-cancel-btn,
+.modal-remove-btn {
+    border: none;
+    border-radius: 8px;
+
+    padding: 11px 18px;
+
+    font-size: 14px;
+    font-weight: 600;
+
+    cursor: pointer;
+}
+
+.modal-cancel-btn {
+    background: #30363d;
+    color: #e6edf3;
+}
+
+.modal-cancel-btn:hover {
+    background: #414852;
+}
+
+.modal-remove-btn {
+    background: #dc2626;
+    color: white;
+}
+
+.modal-remove-btn:hover {
+    background: #b91c1c;
+}
