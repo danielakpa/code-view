@@ -238,5 +238,14 @@ urlpatterns = [
         views.leave_group,
         name="leave_group",
     ),
+    # ============================================================
+# GITHUB REPOSITORY CONNECTION
+# ============================================================
+
+    path(
+        "<int:group_id>/repository/connect/",
+        views.connect_group_repository,
+        name="connect_group_repository",
+    ),
 
 ]

@@ -1,4 +1,10 @@
 """Handle CodeView groups, memberships, discussions, chat, and workspaces."""
+import json
+from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
+from django.http import HttpResponseForbidden
+from .models import GroupRepository,GroupMember, ProjectGroup
+from .forms import GroupRepositoryForm
 from django.http import JsonResponse
 from django.contrib import messages
 from django.core.exceptions import ValidationError
@@ -988,28 +994,51 @@ def reject_membership(request, group_id, request_id):
 def meeting_room(request, group_id):
     """Allow private development group members into their meeting room."""
 
+    # Find the group or return 404 if it doesn't exist.
     group = get_object_or_404(
         ProjectGroup,
         id=group_id,
     )
 
+    # Only private groups can access the development room.
     if not group.is_private:
-
         return HttpResponseForbidden(
             "Meeting rooms are only available to private development groups."
         )
 
+    # Only group members can enter the development room.
     if not is_group_member(group, request.user):
-
         return HttpResponseForbidden(
             "You must belong to this group to enter its meeting room."
         )
 
+    # Get the group's connected GitHub repository, if one exists.
+    repository = GroupRepository.objects.filter(
+        group=group,
+    ).first()
+
+    # Create the form for connecting a GitHub repository.
+    repository_form = GroupRepositoryForm()
+
+    # Check whether the user is the group owner or an admin.
+    can_manage_repository = (
+        group.owner_id == request.user.id
+        or GroupMember.objects.filter(
+            group=group,
+            user=request.user,
+            role="admin",
+        ).exists()
+    )
+
+    # Send all the information to the Development Room template.
     return render(
         request,
         "community/meeting_room.html",
         {
             "group": group,
+            "repository": repository,
+            "repository_form": repository_form,
+            "can_manage_repository": can_manage_repository,
         },
     )
 
@@ -1956,4 +1985,148 @@ def delete_group_message(request, group_id, message_id):
             "group_detail",
             kwargs={"group_id": group.id},
         ) + "#group-chat"
+    )
+
+    # ============================================================
+# GITHUB REPOSITORY CONNECTION
+# ============================================================
+
+@login_required
+@require_POST
+def connect_group_repository(request, group_id):
+    """Connect a verified public GitHub repository to a private group."""
+
+    # Find the group or return 404 if it doesn't exist.
+    group = get_object_or_404(
+        ProjectGroup,
+        id=group_id,
+    )
+
+    # Only private groups can connect repositories.
+    if not group.is_private:
+        return HttpResponseForbidden(
+            "Repository connections are only available to private groups."
+        )
+
+    # Only group admins can connect repositories.
+    is_admin = GroupMember.objects.filter(
+        group=group,
+        user=request.user,
+        role="admin",
+    ).exists()
+
+    # The group owner must also be allowed to connect repositories.
+    if group.owner_id != request.user.id and not is_admin:
+        return HttpResponseForbidden(
+            "Only group admins can connect repositories."
+        )
+
+    # Validate the submitted GitHub URL.
+    form = GroupRepositoryForm(request.POST)
+
+    if not form.is_valid():
+        messages.error(
+            request,
+            "Enter a valid GitHub repository URL.",
+        )
+        return redirect("meeting_room", group_id=group.id)
+
+    # Extract the validated repository details.
+    owner = form.cleaned_data["github_owner"]
+    repository_name = form.cleaned_data["repository_name"]
+
+    # Request public repository information from GitHub.
+    api_url = (
+        f"https://api.github.com/repos/{owner}/{repository_name}"
+    )
+
+    github_request = Request(
+        api_url,
+        headers={
+            "Accept": "application/vnd.github+json",
+            "User-Agent": "CodeView",
+        },
+    )
+
+    try:
+        # Set a timeout so GitHub cannot keep the request waiting forever.
+        with urlopen(github_request, timeout=10) as response:
+            repository_data = json.load(response)
+
+    except HTTPError as error:
+        if error.code == 404:
+            message = "GitHub repository not found or not public."
+        elif error.code in (403, 429):
+            message = "GitHub is temporarily limiting requests. Try again later."
+        else:
+            message = "GitHub could not verify this repository."
+
+        messages.error(request, message)
+        return redirect("meeting_room", group_id=group.id)
+
+    except (URLError, TimeoutError, ValueError, OSError):
+        messages.error(
+            request,
+            "Unable to contact GitHub. Please try again.",
+        )
+        return redirect("meeting_room", group_id=group.id)
+
+    # Reject private repositories in this first implementation.
+    if repository_data.get("private", True):
+        messages.error(
+            request,
+            "Only public repositories are supported for now.",
+        )
+        return redirect("meeting_room", group_id=group.id)
+
+    # Use the verified repository details returned by GitHub.
+    verified_owner = repository_data.get("owner", {}).get("login")
+    verified_name = repository_data.get("name")
+    default_branch = repository_data.get("default_branch")
+
+    if not all([verified_owner, verified_name, default_branch]):
+        messages.error(
+            request,
+            "GitHub returned incomplete repository information.",
+        )
+        return redirect("meeting_room", group_id=group.id)
+
+    # Save the repository connection to PostgreSQL.
+    with transaction.atomic():
+
+        # Lock the group while saving the connection.
+        locked_group = ProjectGroup.objects.select_for_update().get(
+            id=group.id,
+        )
+
+        # Recheck authorization before changing the repository.
+        still_admin = GroupMember.objects.filter(
+            group=locked_group,
+            user=request.user,
+            role="admin",
+        ).exists()
+
+        if locked_group.owner_id != request.user.id and not still_admin:
+            return HttpResponseForbidden(
+                "You no longer have permission to connect repositories."
+            )
+
+        # Update an existing connection or create a new one.
+        GroupRepository.objects.update_or_create(
+            group=locked_group,
+            defaults={
+                "github_owner": verified_owner,
+                "repository_name": verified_name,
+                "default_branch": default_branch,
+            },
+        )
+
+    messages.success(
+        request,
+        "GitHub repository connected successfully!",
+    )
+
+    return redirect(
+        "meeting_room",
+        group_id=group.id,
     )

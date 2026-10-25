@@ -7,6 +7,7 @@ from .models import (
     GroupDiscussion,
     GroupDiscussionComment,
     GroupChatMessage,
+    GroupRepository,  
 )
 
 
@@ -379,3 +380,89 @@ class AddGroupMemberForm(forms.Form):
             )
 
         return username
+
+
+        # ============================================================
+# GITHUB REPOSITORY CONNECTION FORM
+# ============================================================
+
+class GroupRepositoryForm(forms.Form):
+    """Collect and validate a public GitHub repository URL."""
+
+    # Ask the developer to provide a GitHub repository URL.
+    repository_url = forms.URLField(
+        label="GitHub Repository URL",
+        max_length=500,
+        widget=forms.URLInput(
+            attrs={
+                "class": "group-input",
+                "placeholder": "https://github.com/owner/repository",
+            }
+        ),
+    )
+
+    def clean_repository_url(self):
+        """Check that the URL points to a GitHub repository."""
+
+        from urllib.parse import urlparse, unquote
+
+        # Get the URL after Django performs basic URL validation.
+        url = self.cleaned_data["repository_url"].strip()
+
+        # Split the URL into its components.
+        parsed = urlparse(url)
+
+        # Require HTTPS and the official GitHub domain.
+        if parsed.scheme != "https" or parsed.hostname != "github.com":
+            raise forms.ValidationError(
+                "Enter a valid HTTPS GitHub repository URL."
+            )
+
+        # Reject unexpected ports, credentials, queries, and fragments.
+        try:
+            port = parsed.port
+        except ValueError:
+            raise forms.ValidationError("Invalid repository URL.")
+
+        if (
+            parsed.username
+            or parsed.password
+            or port is not None
+            or parsed.query
+            or parsed.fragment
+        ):
+            raise forms.ValidationError(
+                "Enter a standard GitHub repository URL."
+            )
+
+        # Extract the repository owner and name.
+        parts = parsed.path.strip("/").split("/")
+
+        # A repository URL must contain exactly owner/repository.
+        if len(parts) != 2:
+            raise forms.ValidationError(
+                "Use this format: https://github.com/owner/repository"
+            )
+
+        owner, repository = parts
+
+        # Reject encoded characters and invalid repository names.
+        import re
+
+        if (
+            unquote(owner) != owner
+            or unquote(repository) != repository
+            or not re.fullmatch(r"[A-Za-z0-9-]{1,39}", owner)
+            or owner.startswith("-")
+            or owner.endswith("-")
+            or not re.fullmatch(r"[A-Za-z0-9_.-]{1,100}", repository)
+        ):
+            raise forms.ValidationError(
+                "Invalid GitHub repository owner or name."
+            )
+
+        # Store the extracted values for use in the view.
+        self.cleaned_data["github_owner"] = owner
+        self.cleaned_data["repository_name"] = repository
+
+        return url
