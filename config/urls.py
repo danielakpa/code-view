@@ -1,4 +1,9 @@
 """Main URL configuration for CodeView."""
+# Access Django project settings.
+from django.conf import settings
+
+# Helper for serving uploaded files during development.
+from django.conf.urls.static import static
 
 from django.contrib import admin
 from django.urls import include, path
@@ -31,4 +36,15 @@ urlpatterns = [
         ),
     ),
 
+
 ]
+    # ========================================
+# SERVE UPLOADED FILES DURING DEVELOPMENT
+# ========================================
+
+# Only serve uploaded files this way in development.
+if settings.DEBUG:
+    urlpatterns += static(
+        settings.MEDIA_URL,
+        document_root=settings.MEDIA_ROOT,
+    )

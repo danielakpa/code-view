@@ -157,3 +157,13 @@ CHANNEL_LAYERS = {
         "BACKEND": "channels.layers.InMemoryChannelLayer",
     },
 }
+
+# ========================================
+# UPLOADED FILES CONFIGURATION
+# ========================================
+
+# URL used to access uploaded files.
+MEDIA_URL = "/media/"
+
+# Folder where uploaded files are stored.
+MEDIA_ROOT = BASE_DIR / "media"
