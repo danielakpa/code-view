@@ -214,4 +214,29 @@ urlpatterns = [
         name="search_group_developers",
     ),
 
+    # ========================================================
+# GROUP MEMBERSHIP MANAGEMENT
+# ========================================================
+
+    # Remove a developer from a group.
+    path(
+        "<int:group_id>/members/<int:member_id>/remove/",
+        views.remove_group_member,
+        name="remove_group_member",
+    ),
+
+    # Promote or demote a group administrator.
+    path(
+        "<int:group_id>/members/<int:member_id>/role/",
+        views.change_group_member_role,
+        name="change_group_member_role",
+    ),
+
+    # Allow a developer to leave a group.
+    path(
+        "<int:group_id>/members/leave/",
+        views.leave_group,
+        name="leave_group",
+    ),
+
 ]

@@ -1091,45 +1091,121 @@
 
                         <div class="workspace-members">
 
-                            {% for membership in members %}
+{% for membership in members %}
 
-                                <div class="workspace-member">
+    <div class="workspace-member">
 
-                                    <span class="discussion-avatar">
-                                        {{ membership.user.username|first|upper }}
-                                    </span>
+        <!-- Member avatar -->
+        <span class="discussion-avatar">
+            {{ membership.user.username|first|upper }}
+        </span>
 
-                                    <div>
+        <!-- Member username and role -->
+        <div>
+            <strong>
+                {{ membership.user.username }}
+            </strong>
 
-                                        <strong>
-                                            {{ membership.user.username }}
-                                        </strong>
+            <small>
+                {% if membership.user_id == group.owner_id %}
+                    Owner
+                {% else %}
+                    {{ membership.get_role_display }}
+                {% endif %}
+            </small>
+        </div>
 
-                                        <small>
+        <!-- MEMBER MANAGEMENT BUTTONS -->
+        {% if is_admin and membership.user_id != group.owner_id %}
 
-                                            {% if membership.user_id == group.owner_id %}
+            <div class="member-actions">
 
-                                                Owner
+                <!-- Only the owner can promote or demote -->
+                {% if request.user.id == group.owner_id %}
 
-                                            {% else %}
+                    <form
+                        method="POST"
+                        action="{% url 'change_group_member_role' group.id membership.id %}"
+                    >
+                        {% csrf_token %}
 
-                                                {{ membership.get_role_display }}
+                        {% if membership.role == "member" %}
 
-                                            {% endif %}
+                            <input type="hidden" name="role" value="admin">
 
-                                        </small>
+                            <button type="submit" class="member-role-btn">
+                                Make Admin
+                            </button>
 
-                                    </div>
+                        {% else %}
 
-                                </div>
+                            <input type="hidden" name="role" value="member">
 
-                            {% empty %}
+                            <button type="submit" class="member-role-btn">
+                                Remove Admin
+                            </button>
 
+                        {% endif %}
+
+                    </form>
+
+                {% endif %}
+
+                <!-- Owner can remove admins and members.
+                     Admins can remove ordinary members only. -->
+                {% if request.user.id == group.owner_id or membership.role == "member" %}
+
+                    <form
+                        method="POST"
+                        action="{% url 'remove_group_member' group.id membership.id %}"
+                        onsubmit="return confirm('Remove this developer from the group?');"
+                    >
+                        {% csrf_token %}
+
+                        <button type="submit" class="member-remove-btn">
+                            Remove
+                        </button>
+
+                    </form>
+
+                {% endif %}
+
+            </div>
+
+        {% endif %}
+
+    </div>
+
+{% empty %}
                                 <p>
                                     No members yet.
                                 </p>
 
                             {% endfor %}
+
+                            <!-- LEAVE GROUP BUTTON -->
+
+{% if is_member and request.user.id != group.owner_id %}
+
+    <div class="leave-group-section">
+
+        <form
+            method="POST"
+            action="{% url 'leave_group' group.id %}"
+            onsubmit="return confirm('Are you sure you want to leave this group?');"
+        >
+            {% csrf_token %}
+
+            <button type="submit" class="leave-group-btn">
+                Leave Group
+            </button>
+
+        </form>
+
+    </div>
+
+{% endif %}
+
 
                            <!-- ADD DEVELOPER: ADMIN ONLY -->
 {% if is_admin and group.join_policy != "invite" %}

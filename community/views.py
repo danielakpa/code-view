@@ -594,6 +594,155 @@ def add_group_member(request, group_id):
 # SEARCH REGISTERED DEVELOPERS
 # ============================================================
 
+# ============================================================
+# GROUP MEMBERSHIP MANAGEMENT
+# ============================================================
+
+@login_required
+@require_POST
+def remove_group_member(request, group_id, member_id):
+    """Allow authorized administrators to remove group members."""
+
+    with transaction.atomic():
+
+        # Lock the group while changing its membership.
+        group = get_object_or_404(
+            ProjectGroup.objects.select_for_update(),
+            id=group_id,
+        )
+
+        # Find the administrator performing this action.
+        actor = GroupMember.objects.filter(
+            group=group,
+            user=request.user,
+            role="admin",
+        ).first()
+
+        if actor is None:
+            return HttpResponseForbidden(
+                "Only group administrators can remove members."
+            )
+
+        # Find the membership being removed.
+        target = get_object_or_404(
+            GroupMember.objects.select_for_update(),
+            id=member_id,
+            group=group,
+        )
+
+        # Never remove the group owner.
+        if target.user_id == group.owner_id:
+            return HttpResponseForbidden(
+                "The group owner cannot be removed."
+            )
+
+        # Only the owner can remove another administrator.
+        if target.role == "admin" and request.user.id != group.owner_id:
+            return HttpResponseForbidden(
+                "Only the owner can remove administrators."
+            )
+
+        username = target.user.username
+
+        # Delete the membership.
+        target.delete()
+
+    messages.success(
+        request,
+        f"{username} was removed from the group."
+    )
+
+    return redirect("group_detail", group_id=group_id)
+
+
+@login_required
+@require_POST
+def change_group_member_role(request, group_id, member_id):
+    """Allow the group owner to promote or demote administrators."""
+
+    with transaction.atomic():
+
+        group = get_object_or_404(
+            ProjectGroup.objects.select_for_update(),
+            id=group_id,
+        )
+
+        # Only the owner can manage administrator roles.
+        if request.user.id != group.owner_id:
+            return HttpResponseForbidden(
+                "Only the group owner can change member roles."
+            )
+
+        target = get_object_or_404(
+            GroupMember.objects.select_for_update(),
+            id=member_id,
+            group=group,
+        )
+
+        # Protect the owner's administrator role.
+        if target.user_id == group.owner_id:
+            return HttpResponseForbidden(
+                "The owner's role cannot be changed."
+            )
+
+        # Accept only supported roles.
+        new_role = request.POST.get("role", "").strip()
+
+        if new_role not in ("admin", "member"):
+            return HttpResponseBadRequest(
+                "Invalid membership role."
+            )
+
+        # Update the role in the database.
+        target.role = new_role
+        target.save(update_fields=["role"])
+
+    messages.success(
+        request,
+        f"{target.user.username} is now a group {new_role}."
+    )
+
+    return redirect("group_detail", group_id=group_id)
+
+
+@login_required
+@require_POST
+def leave_group(request, group_id):
+    """Allow members to leave a group voluntarily."""
+
+    with transaction.atomic():
+
+        group = get_object_or_404(
+            ProjectGroup.objects.select_for_update(),
+            id=group_id,
+        )
+
+        membership = GroupMember.objects.filter(
+            group=group,
+            user=request.user,
+        ).first()
+
+        if membership is None:
+            return HttpResponseBadRequest(
+                "You are not a member of this group."
+            )
+
+        # Owners must transfer ownership before leaving.
+        if request.user.id == group.owner_id:
+            return HttpResponseForbidden(
+                "Transfer group ownership before leaving."
+            )
+
+        membership.delete()
+
+    messages.success(
+        request,
+        "You have left the group successfully."
+    )
+
+    return redirect("groups")
+
+    
 @login_required
 @require_GET
 def search_group_developers(request, group_id):
