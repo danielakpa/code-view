@@ -57,6 +57,15 @@ urlpatterns = [
         views.membership_requests,
         name="membership_requests",
     ),
+    # ========================================================
+    # ADD GROUP MEMBER (ADMINISTRATORS)
+    # ========================================================
+
+    path(
+        "<int:group_id>/members/add/",
+        views.add_group_member,
+        name="add_group_member",
+    ),
 
     # Approve a developer's membership request.
     path(
@@ -197,6 +206,12 @@ urlpatterns = [
         "<int:group_id>/chat/<int:message_id>/delete/",
         views.delete_group_message,
         name="delete_group_message",
+    ),
+    # Search registered developers while typing.
+    path(
+        "<int:group_id>/members/search/",
+        views.search_group_developers,
+        name="search_group_developers",
     ),
 
 ]

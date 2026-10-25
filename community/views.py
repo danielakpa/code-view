@@ -1,10 +1,11 @@
 """Handle CodeView groups, memberships, discussions, chat, and workspaces."""
 from django.http import JsonResponse
 from django.contrib import messages
+from django.core.exceptions import ValidationError
+from django.views.decorators.http import require_GET
 from django.db import transaction
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
-from django.db import transaction
 from django.urls import reverse
 from django.shortcuts import redirect
 from channels.layers import get_channel_layer
@@ -24,6 +25,7 @@ from .forms import (
     GroupDiscussionForm,
     GroupDiscussionCommentForm,
     GroupChatMessageForm,
+     AddGroupMemberForm,
 )
 
 from .models import (
@@ -486,6 +488,169 @@ def membership_requests(request, group_id):
         },
     )
 
+    # ============================================================
+# ADD GROUP MEMBER
+# ============================================================
+
+@login_required
+@require_POST
+def add_group_member(request, group_id):
+    """Allow group administrators to add registered developers."""
+
+    # Validate the submitted username.
+    form = AddGroupMemberForm(request.POST)
+
+    if not form.is_valid():
+        messages.error(request, "Please enter a valid username.")
+        return redirect("group_detail", group_id=group_id)
+
+    # Get the project's configured user model.
+    User = get_user_model()
+
+    # Find the developer by username.
+    developer = User.objects.filter(
+        username=form.cleaned_data["username"]
+    ).first()
+
+    if developer is None:
+        messages.error(request, "Developer not found.")
+        return redirect("group_detail", group_id=group_id)
+
+    # Perform membership checks and changes together.
+    with transaction.atomic():
+
+        # Lock the group to coordinate membership changes.
+        group = get_object_or_404(
+            ProjectGroup.objects.select_for_update(),
+            id=group_id,
+        )
+
+        # Only group administrators can add developers.
+        is_admin = GroupMember.objects.filter(
+            group=group,
+            user=request.user,
+            role="admin",
+        ).exists()
+
+        if not is_admin:
+            return HttpResponseForbidden(
+                "Only group administrators can add members."
+            )
+
+        # Invitation-only groups require an invitation workflow.
+        if group.join_policy == "invite":
+            messages.error(
+                request,
+                "Invitation-only groups require an accepted invitation."
+            )
+            return redirect("group_detail", group_id=group_id)
+
+        # Prevent adding the same developer twice.
+        if GroupMember.objects.filter(
+            group=group,
+            user=developer,
+        ).exists():
+            messages.error(
+                request,
+                "This developer is already a group member."
+            )
+            return redirect("group_detail", group_id=group_id)
+
+        # Check the private group's membership limit.
+        if group.is_private:
+            member_count = GroupMember.objects.filter(
+                group=group
+            ).count()
+
+            if member_count >= 10:
+                messages.error(
+                    request,
+                    "Private groups cannot exceed 10 members."
+                )
+                return redirect("group_detail", group_id=group_id)
+
+        # Create the membership.
+        try:
+            GroupMember.objects.create(
+                group=group,
+                user=developer,
+                role="member",
+            )
+        except ValidationError:
+            messages.error(
+                request,
+                "Unable to add this developer to the group."
+            )
+            return redirect("group_detail", group_id=group_id)
+
+    messages.success(
+        request,
+        f"{developer.username} was added successfully!"
+    )
+
+    return redirect("group_detail", group_id=group_id)
+
+# ============================================================
+# SEARCH REGISTERED DEVELOPERS
+# ============================================================
+
+@login_required
+@require_GET
+def search_group_developers(request, group_id):
+    """Search registered developers for group administrators."""
+
+    # Find the group.
+    group = get_object_or_404(
+        ProjectGroup,
+        id=group_id,
+    )
+
+    # Only administrators can search for developers to add.
+    is_admin = GroupMember.objects.filter(
+        group=group,
+        user=request.user,
+        role="admin",
+    ).exists()
+
+    if not is_admin:
+        return JsonResponse(
+            {"error": "Permission denied."},
+            status=403,
+        )
+
+    # Read the text entered in the search box.
+    query = request.GET.get("q", "").strip()
+
+    # Don't search until at least two characters are entered.
+    if len(query) < 2:
+        return JsonResponse({"users": []})
+
+    # Get the configured Django user model.
+    User = get_user_model()
+
+    # Find developers who already belong to this group.
+    existing_members = GroupMember.objects.filter(
+        group=group,
+    ).values_list("user_id", flat=True)
+
+    # Search registered developers by username.
+    developers = (
+        User.objects
+        .filter(username__icontains=query)
+        .exclude(id__in=existing_members)
+        .order_by("username")[:10]
+    )
+
+    # Convert matching developers into JSON.
+    results = [
+        {
+            "id": developer.id,
+            "username": developer.username,
+        }
+        for developer in developers
+    ]
+
+    return JsonResponse({"users": results})
 
 # ============================================================
 # 6. APPROVE MEMBERSHIP REQUEST

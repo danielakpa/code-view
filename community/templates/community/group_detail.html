@@ -1131,6 +1131,50 @@
 
                             {% endfor %}
 
+                           <!-- ADD DEVELOPER: ADMIN ONLY -->
+{% if is_admin and group.join_policy != "invite" %}
+
+<div class="add-member-section">
+
+    <h3>Add Developer</h3>
+
+    <form
+        method="POST"
+        action="{% url 'add_group_member' group.id %}"
+    >
+        {% csrf_token %}
+
+       <!-- Container for live developer search -->
+<div class="developer-search-container">
+
+    <!-- Search registered developers -->
+    <input
+        type="text"
+        id="developer-search"
+        name="username"
+        data-search-url="{% url 'search_group_developers' group.id %}"
+        placeholder="Search developer username..."
+        autocomplete="off"
+        required
+    >
+
+    <!-- JavaScript will display matching developers here -->
+    <div
+        id="developer-search-results"
+        class="developer-search-results"
+    ></div>
+
+</div>
+
+        <button type="submit">
+            Add Member
+        </button>
+
+    </form>
+
+</div>
+
+{% endif %}
                         </div>
 
                     </section>
@@ -1173,6 +1217,10 @@
     src="{% static 'community/group_chat.js' %}"
     defer
 ></script>
+<script
+    src="{% static 'community/developer_search.js' %}"
+    defer>
+</script>
 
 <body data-current-user-id="{{ request.user.id }}">
 </html>

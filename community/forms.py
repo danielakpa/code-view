@@ -348,3 +348,34 @@ class GroupChatMessageForm(forms.ModelForm):
                 )
 
         return cleaned_data
+
+
+# ============================================================
+# 5. ADD GROUP MEMBER
+# ============================================================
+
+class AddGroupMemberForm(forms.Form):
+    """Allow administrators to select a registered developer."""
+
+    # Store the username entered by the administrator.
+    username = forms.CharField(
+        max_length=150,
+        widget=forms.TextInput(
+            attrs={
+                "class": "group-input",
+                "placeholder": "Enter developer username",
+            }
+        ),
+    )
+
+    def clean_username(self):
+        """Remove unnecessary spaces from the username."""
+
+        username = self.cleaned_data["username"].strip()
+
+        if not username:
+            raise forms.ValidationError(
+                "Please enter a developer username."
+            )
+
+        return username
