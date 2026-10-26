@@ -271,3 +271,275 @@ document.addEventListener("DOMContentLoaded", async () => {
         fileTree.textContent = error.message;
     }
 });
+// ============================================================
+// CODEVIEW — TEAM CHAT INTERFACE
+// ============================================================
+
+// This controls the chat interface only.
+// Real messaging will be connected using Django Channels later.
+
+document.addEventListener("DOMContentLoaded", () => {
+
+    // Find the chat panel.
+    const chatPanel = document.getElementById("team-chat-panel");
+
+    // Find the workspace containing the editor and chat.
+    const workspace = document.getElementById("workspace-with-chat");
+
+    // Find the button in the page header.
+    const headerChatButton = document.getElementById(
+        "header-chat-toggle"
+    );
+
+    // Find the button in the sidebar.
+    const sidebarChatButton = document.getElementById(
+        "sidebar-chat-toggle"
+    );
+
+    // Find the button that closes the chat.
+    const closeChatButton = document.getElementById("close-chat");
+
+    // Stop if the current page does not contain the chat interface.
+    if (!chatPanel || !workspace) {
+        return;
+    }
+
+    // Remember whether the developer previously closed the chat
+    // in this browser tab.
+    let chatIsOpen = sessionStorage.getItem(
+        "codeview-chat-open"
+    ) !== "false";
+
+
+    // ========================================================
+    // FUNCTION 1 — UPDATE CHAT VISIBILITY
+    // ========================================================
+
+    function updateChatVisibility() {
+
+        // Hide or display the chat panel.
+        chatPanel.hidden = !chatIsOpen;
+
+        // Expand the development workspace when chat is hidden.
+        workspace.classList.toggle(
+            "chat-collapsed",
+            !chatIsOpen
+        );
+
+        // Update accessibility information.
+        if (headerChatButton) {
+            headerChatButton.setAttribute(
+                "aria-expanded",
+                String(chatIsOpen)
+            );
+        }
+
+        if (sidebarChatButton) {
+            sidebarChatButton.setAttribute(
+                "aria-expanded",
+                String(chatIsOpen)
+            );
+        }
+
+        // Save the developer's preference for this browser tab.
+        sessionStorage.setItem(
+            "codeview-chat-open",
+            String(chatIsOpen)
+        );
+    }
+
+
+    // ========================================================
+    // FUNCTION 2 — OPEN CHAT
+    // ========================================================
+
+    function openChat() {
+
+        chatIsOpen = true;
+
+        updateChatVisibility();
+    }
+
+
+    // ========================================================
+    // FUNCTION 3 — CLOSE CHAT
+    // ========================================================
+
+    function closeChat() {
+
+        chatIsOpen = false;
+
+        updateChatVisibility();
+    }
+
+
+    // ========================================================
+    // FUNCTION 4 — TOGGLE CHAT
+    // ========================================================
+
+    function toggleChat() {
+
+        chatIsOpen = !chatIsOpen;
+
+        updateChatVisibility();
+    }
+
+
+    // ========================================================
+    // CHAT BUTTON EVENTS
+    // ========================================================
+
+    // The header button opens or closes chat.
+    if (headerChatButton) {
+
+        headerChatButton.addEventListener(
+            "click",
+            toggleChat
+        );
+    }
+
+    // The sidebar button opens chat.
+    if (sidebarChatButton) {
+
+        sidebarChatButton.addEventListener(
+            "click",
+            openChat
+        );
+    }
+
+    // The close button hides chat.
+    if (closeChatButton) {
+
+        closeChatButton.addEventListener(
+            "click",
+            closeChat
+        );
+    }
+
+
+    // ========================================================
+    // FUNCTION 5 — UPDATE UNREAD MESSAGE COUNTER
+    // ========================================================
+
+    function updateUnreadCount(count) {
+
+        // Convert the received count into a number.
+        const unreadCount = Number(count);
+
+        // Reject invalid unread counts.
+        if (
+            !Number.isSafeInteger(unreadCount) ||
+            unreadCount < 0
+        ) {
+            return;
+        }
+
+        // Find all unread message badges.
+        const badges = document.querySelectorAll(
+            "[data-unread-count]"
+        );
+
+        badges.forEach((badge) => {
+
+            // Display the number of unread messages.
+            badge.textContent = String(unreadCount);
+
+            // Hide the badge when there are no unread messages.
+            badge.hidden = unreadCount === 0;
+
+        });
+    }
+
+
+    // ========================================================
+    // FUNCTION 6 — PREPARE A MESSAGE REPLY
+    // ========================================================
+
+    function replyToMessage(message) {
+
+        // A real message must have an ID and author.
+        if (!message || !message.id || !message.author) {
+            return;
+        }
+
+        // Find the reply preview.
+        const replyPreview = document.getElementById(
+            "chat-reply-preview"
+        );
+
+        const replyDescription = document.getElementById(
+            "chat-reply-description"
+        );
+
+        if (!replyPreview || !replyDescription) {
+            return;
+        }
+
+        // Display which message the developer is replying to.
+        replyDescription.textContent =
+            `Replying to ${message.author}: ${message.text || ""}`;
+
+        // Store the ID of the original message.
+        replyPreview.dataset.replyToId = String(message.id);
+
+        // Display the reply preview.
+        replyPreview.hidden = false;
+
+        // Open the chat panel.
+        openChat();
+    }
+
+
+    // ========================================================
+    // CANCEL REPLY BUTTON
+    // ========================================================
+
+    const cancelReplyButton = document.getElementById(
+        "cancel-chat-reply"
+    );
+
+    if (cancelReplyButton) {
+
+        cancelReplyButton.addEventListener("click", () => {
+
+            const replyPreview = document.getElementById(
+                "chat-reply-preview"
+            );
+
+            if (!replyPreview) {
+                return;
+            }
+
+            // Hide the reply preview.
+            replyPreview.hidden = true;
+
+            // Remove the selected message ID.
+            delete replyPreview.dataset.replyToId;
+
+        });
+    }
+
+
+    // ========================================================
+    // PREPARE FOR FUTURE DJANGO CHANNELS INTEGRATION
+    // ========================================================
+
+    // These functions will be used when real-time messaging
+    // is implemented. They do not fetch or create messages yet.
+    window.codeviewChatUI = {
+
+        open: openChat,
+
+        close: closeChat,
+
+        notifyNewMessages: updateUnreadCount,
+
+        replyTo: replyToMessage,
+
+    };
+
+
+    // Apply the saved chat visibility when the page loads.
+    updateChatVisibility();
+
+});
