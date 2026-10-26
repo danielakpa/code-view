@@ -1034,16 +1034,9 @@ chatMessages.addEventListener("click", function (event) {
 
         try {
 
-          // Send the edit or delete request to Django.
-const response = await submitForm(form);
-
-// Read Django's JSON response.
-const result = await response.json();
-
-// Make sure Django accepted the request.
-if (!result.success) {
-    throw new Error(result.error || "Action failed.");
-}
+// Send the edit or delete request to Django.
+// submitForm() already returns validated JSON data.
+const result = await submitForm(form);
 
 // Immediately update the edited message.
 if (isEdit) {

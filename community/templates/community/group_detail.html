@@ -1191,10 +1191,11 @@
 
     <div class="leave-group-section">
 
-       <form
+<!-- Form for adding developers without refreshing the page -->
+<form
+    id="add-member-form"
     method="POST"
-    action="{% url 'leave_group' group.id %}"
-    class="leave-group-form"
+    action="{% url 'add_group_member' group.id %}"
 >
     {% csrf_token %}
 
@@ -1381,7 +1382,6 @@
 <script src="{% static 'community/group_detail/group_chat.js' %}" defer></script>
 
 <script src="{% static 'community/group_detail/developer_search.js' %}" defer></script>
-</script>
 
 <body>
 </html>
