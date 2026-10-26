@@ -1,52 +1,191 @@
 """Handle CodeView groups, memberships, discussions, chat, and workspaces."""
+
+
+# ============================================================
+# 1. PYTHON BUILT-IN MODULES
+# ============================================================
+
+# Used to convert JSON data into Python dictionaries and lists.
 import json
+
+# Used to safely encode values when building URLs.
+from urllib.parse import quote
+
+# Used to handle errors when making HTTP requests.
 from urllib.error import HTTPError, URLError
+
+# Used to send HTTP requests to external services like GitHub.
 from urllib.request import Request, urlopen
-from django.http import HttpResponseForbidden
-from .models import GroupRepository,GroupMember, ProjectGroup
-from .forms import GroupRepositoryForm
-from django.http import JsonResponse
-from django.contrib import messages
-from django.core.exceptions import ValidationError
-from django.views.decorators.http import require_GET
-from django.db import transaction
+
+
+# ============================================================
+# 2. DJANGO AUTHENTICATION
+# ============================================================
+
+# Gets the user model configured for this Django project.
 from django.contrib.auth import get_user_model
+
+# Restricts access to views so only logged-in users can use them.
 from django.contrib.auth.decorators import login_required
-from django.urls import reverse
-from django.shortcuts import redirect
-from channels.layers import get_channel_layer
-from asgiref.sync import async_to_sync
+
+
+# ============================================================
+# 3. DJANGO MESSAGES
+# ============================================================
+
+# Displays success, warning, and error messages to users.
+from django.contrib import messages
+
+
+# ============================================================
+# 4. DJANGO DATABASE
+# ============================================================
+
+# Allows multiple database operations to succeed or fail together.
+from django.db import transaction
+
+# Q builds complex database filters; Count counts matching records.
 from django.db.models import Q, Count
+
+
+# ============================================================
+# 5. DJANGO VALIDATION
+# ============================================================
+
+# Used to raise errors when submitted data is invalid.
+from django.core.exceptions import ValidationError
+
+
+# ============================================================
+# 6. DJANGO HTTP RESPONSES
+# ============================================================
+
 from django.http import (
+    # Returns a 403 response when a user has no permission.
     HttpResponseForbidden,
+
+    # Returns a 400 response when a request contains invalid data.
     HttpResponseBadRequest,
+
+    # Sends Python dictionaries or lists as JSON responses.
     JsonResponse,
 )
-from django.shortcuts import get_object_or_404, redirect, render
+
+
+# ============================================================
+# 7. DJANGO SHORTCUTS
+# ============================================================
+
+from django.shortcuts import (
+    # Finds a database object or returns a 404 error.
+    get_object_or_404,
+
+    # Redirects the user to another page.
+    redirect,
+
+    # Combines an HTML template with data and returns the page.
+    render,
+)
+
+
+# ============================================================
+# 8. DJANGO URLS
+# ============================================================
+
+# Generates a URL using the name of a registered Django route.
+from django.urls import reverse
+
+
+# ============================================================
+# 9. DJANGO TIME
+# ============================================================
+
+# Provides timezone-aware date and time utilities.
 from django.utils import timezone
+
+
+# ============================================================
+# 10. DJANGO REQUEST METHODS
+# ============================================================
+
+# Allows a view to accept only GET requests.
+from django.views.decorators.http import require_GET
+
+# Allows a view to accept only POST requests.
 from django.views.decorators.http import require_POST
 
+
+# ============================================================
+# 11. DJANGO CHANNELS
+# ============================================================
+
+# Gets the channel layer used to send real-time WebSocket messages.
+from channels.layers import get_channel_layer
+
+# Allows synchronous Django code to call asynchronous functions.
+from asgiref.sync import async_to_sync
+
+
+# ============================================================
+# 12. CODEVIEW FORMS
+# ============================================================
+
 from .forms import (
+    # Validates information when creating or updating a group.
     ProjectGroupForm,
+
+    # Validates information when creating group discussions.
     GroupDiscussionForm,
+
+    # Validates comments submitted to discussions.
     GroupDiscussionCommentForm,
+
+    # Validates chat messages sent by group members.
     GroupChatMessageForm,
-     AddGroupMemberForm,
+
+    # Validates information when adding members to a group.
+    AddGroupMemberForm,
+
+    # Validates GitHub repository URLs before connecting them.
+    GroupRepositoryForm,
 )
+
+
+# ============================================================
+# 13. CODEVIEW DATABASE MODELS
+# ============================================================
 
 from .models import (
+    # Represents a project group in CodeView.
     ProjectGroup,
+
+    # Represents a developer who belongs to a group.
     GroupMember,
+
+    # Stores requests from developers who want to join groups.
     GroupMembershipRequest,
+
+    # Stores discussions created inside groups.
     GroupDiscussion,
+
+    # Stores comments made on group discussions.
     GroupDiscussionComment,
+
+    # Stores likes given to group discussions.
     GroupDiscussionLike,
+
+    # Stores discussions hidden from a developer's view.
     HiddenDiscussion,
+
+    # Stores messages sent inside a group's chat.
     GroupChatMessage,
+
+    # Stores code saved on a group's shared Code Board.
     GroupCodeBoard,
+
+    # Stores GitHub repository details connected to a group.
+    GroupRepository,
 )
-
-
 # ============================================================
 # HELPER: CHECK GROUP MEMBERSHIP
 # ============================================================
@@ -2129,4 +2268,262 @@ def connect_group_repository(request, group_id):
     return redirect(
         "meeting_room",
         group_id=group.id,
+    )
+
+    # ============================================================
+# GITHUB REPOSITORY FILE EXPLORER
+# ============================================================
+
+@login_required
+def group_repository_files(request, group_id):
+    """Retrieve the connected repository's files from GitHub."""
+
+    # Find the requested development group.
+    group = get_object_or_404(
+        ProjectGroup,
+        id=group_id,
+    )
+
+    # Only private development groups can access this feature.
+    if not group.is_private:
+        return HttpResponseForbidden(
+            "Repository files are only available to private groups."
+        )
+
+    # Only group members can view repository files.
+    if not is_group_member(group, request.user):
+        return HttpResponseForbidden(
+            "You must belong to this group to view repository files."
+        )
+
+    # Find the repository connected to this group.
+    repository = GroupRepository.objects.filter(
+        group=group,
+    ).first()
+
+    if repository is None:
+        return JsonResponse(
+            {"error": "No GitHub repository connected."},
+            status=404,
+        )
+
+    # Encode the repository details for safe URL construction.
+    owner = quote(repository.github_owner, safe="")
+    repo_name = quote(repository.repository_name, safe="")
+    branch = quote(repository.default_branch, safe="")
+
+    # Request the complete file tree from GitHub.
+    api_url = (
+        f"https://api.github.com/repos/{owner}/{repo_name}"
+        f"/git/trees/{branch}?recursive=1"
+    )
+
+    github_request = Request(
+        api_url,
+        headers={
+            "Accept": "application/vnd.github+json",
+            "User-Agent": "CodeView",
+        },
+    )
+
+    try:
+        # Retrieve repository information from GitHub.
+        with urlopen(github_request, timeout=10) as response:
+            repository_data = json.load(response)
+
+    except HTTPError as error:
+        if error.code == 404:
+            message = "Repository or branch not found."
+        elif error.code in (403, 429):
+            message = "GitHub request limit reached. Try again later."
+        else:
+            message = "Unable to retrieve repository files."
+
+        return JsonResponse(
+            {"error": message},
+            status=502,
+        )
+
+    except (URLError, TimeoutError, ValueError, OSError):
+        return JsonResponse(
+            {"error": "Unable to contact GitHub."},
+            status=502,
+        )
+
+    # GitHub may truncate very large repository trees.
+    if repository_data.get("truncated"):
+        return JsonResponse(
+            {
+                "error": (
+                    "This repository is too large to load completely. "
+                    "Folder-by-folder loading will be added later."
+                )
+            },
+            status=422,
+        )
+
+    # Extract the files and folders from GitHub's response.
+    files = []
+
+    for item in repository_data.get("tree", []):
+
+        # Only include files and directories.
+        if item.get("type") not in ("blob", "tree"):
+            continue
+
+        files.append(
+            {
+                "name": item["path"].split("/")[-1],
+                "path": item["path"],
+                "type": (
+                    "folder"
+                    if item["type"] == "tree"
+                    else "file"
+                ),
+            }
+        )
+
+    # Return the repository files as JSON.
+    return JsonResponse(
+        {
+            "repository": (
+                f"{repository.github_owner}/"
+                f"{repository.repository_name}"
+            ),
+            "branch": repository.default_branch,
+            "files": files,
+        }
+    )
+
+    # ============================================================
+# GITHUB REPOSITORY FILE CONTENT
+# ============================================================
+
+@login_required
+@require_GET
+def group_repository_file_content(request, group_id):
+    """Retrieve the contents of a file from the connected GitHub repository."""
+
+    # Find the development group.
+    group = get_object_or_404(
+        ProjectGroup,
+        id=group_id,
+    )
+
+    # Only private groups can use the Development Room.
+    if not group.is_private:
+        return HttpResponseForbidden(
+            "Repository files are only available to private groups."
+        )
+
+    # Only group members can read repository files.
+    if not is_group_member(group, request.user):
+        return HttpResponseForbidden(
+            "You must belong to this group to view repository files."
+        )
+
+    # Find the GitHub repository connected to this group.
+    repository = GroupRepository.objects.filter(
+        group=group,
+    ).first()
+
+    if repository is None:
+        return JsonResponse(
+            {"error": "No GitHub repository connected."},
+            status=404,
+        )
+
+    # Get the selected file path from the browser.
+    file_path = request.GET.get("path", "")
+
+    # Reject empty or invalid file paths.
+    if (
+        not file_path
+        or file_path.startswith("/")
+        or "\\" in file_path
+        or any(
+            part in ("", ".", "..")
+            for part in file_path.split("/")
+        )
+    ):
+        return JsonResponse(
+            {"error": "Invalid repository file path."},
+            status=400,
+        )
+
+    # Encode repository information for the GitHub API URL.
+    owner = quote(repository.github_owner, safe="")
+    repo_name = quote(repository.repository_name, safe="")
+    branch = quote(repository.default_branch, safe="")
+
+    # Encode each part of the selected file path.
+    encoded_path = "/".join(
+        quote(part, safe="")
+        for part in file_path.split("/")
+    )
+
+    # GitHub Contents API returns the file contents.
+    api_url = (
+        f"https://api.github.com/repos/{owner}/{repo_name}"
+        f"/contents/{encoded_path}?ref={branch}"
+    )
+
+    github_request = Request(
+        api_url,
+        headers={
+            "Accept": "application/vnd.github.raw+json",
+            "User-Agent": "CodeView",
+        },
+    )
+
+    try:
+        # Request the selected file from GitHub.
+        with urlopen(github_request, timeout=10) as response:
+
+            # Read at most 1 MiB plus one byte.
+            raw_content = response.read(1024 * 1024 + 1)
+
+    except HTTPError as error:
+        if error.code == 404:
+            message = "File not found in the connected repository."
+        elif error.code in (403, 429):
+            message = "GitHub request limit reached. Try again later."
+        else:
+            message = "Unable to retrieve this file."
+
+        return JsonResponse(
+            {"error": message},
+            status=502,
+        )
+
+    except (URLError, TimeoutError, OSError):
+        return JsonResponse(
+            {"error": "Unable to contact GitHub."},
+            status=502,
+        )
+
+    # Prevent very large files from overwhelming the editor.
+    if len(raw_content) > 1024 * 1024:
+        return JsonResponse(
+            {"error": "This file is too large to preview."},
+            status=413,
+        )
+
+    # This first version supports UTF-8 text files.
+    try:
+        content = raw_content.decode("utf-8")
+
+    except UnicodeDecodeError:
+        return JsonResponse(
+            {"error": "This file is not supported as a text preview."},
+            status=415,
+        )
+
+    # Return the source code to the Development Room.
+    return JsonResponse(
+        {
+            "path": file_path,
+            "content": content,
+            "branch": repository.default_branch,
+        }
     )

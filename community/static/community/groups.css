@@ -614,3 +614,29 @@ textarea {
 .group-action:hover {
     background-color: #16a34a;
 }
+/* ============================================
+   DEVELOPMENT ROOM MESSAGES
+============================================ */
+
+.development-room-messages {
+    margin: 20px 0;
+}
+
+.development-room-messages .message {
+    padding: 12px 16px;
+    margin-bottom: 10px;
+    border-radius: 8px;
+    font-size: 14px;
+}
+
+.development-room-messages .success {
+    background-color: #153d2b;
+    color: #4ade80;
+    border: 1px solid #166534;
+}
+
+.development-room-messages .error {
+    background-color: #451a1a;
+    color: #fca5a5;
+    border: 1px solid #991b1b;
+}

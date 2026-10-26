@@ -247,5 +247,17 @@ urlpatterns = [
         views.connect_group_repository,
         name="connect_group_repository",
     ),
+        # Retrieve the connected GitHub repository's file tree.
+    path(
+        "<int:group_id>/repository/files/",
+        views.group_repository_files,
+        name="group_repository_files",
+    ),
+        # Retrieve the source code of a selected GitHub file.
+    path(
+        "<int:group_id>/repository/file-content/",
+        views.group_repository_file_content,
+        name="group_repository_file_content",
+    ),
 
 ]

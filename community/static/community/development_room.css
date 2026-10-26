@@ -1,0 +1,140 @@
+/* ============================================================
+   CODEVIEW DEVELOPMENT ROOM
+   ============================================================ */
+
+/* Main workspace layout */
+.development-workspace {
+    display: grid;
+    grid-template-columns: 260px minmax(0, 1fr);
+    min-height: 500px;
+    margin-top: 24px;
+    border: 1px solid #363636;
+    border-radius: 10px;
+    overflow: hidden;
+    background: #1e1e1e;
+}
+
+/* Left file explorer */
+.development-explorer {
+    background: #252526;
+    border-right: 1px solid #363636;
+    padding: 16px;
+    min-width: 0;
+}
+
+/* Explorer heading */
+.explorer-header {
+    margin-bottom: 20px;
+}
+
+.explorer-header h2 {
+    margin: 0 0 8px;
+    font-size: 14px;
+    text-transform: uppercase;
+}
+
+.explorer-header span {
+    color: #9ca3af;
+    font-size: 13px;
+    overflow-wrap: anywhere;
+}
+
+/* File tree */
+#github-file-tree {
+    font-size: 14px;
+    color: #d4d4d4;
+    overflow-wrap: anywhere;
+}
+
+/* File and folder buttons */
+.explorer-item {
+    display: block;
+    width: 100%;
+    padding: 7px 8px;
+    border: none;
+    border-radius: 5px;
+    background: transparent;
+    color: #d4d4d4;
+    text-align: left;
+    cursor: pointer;
+    font: inherit;
+}
+
+.explorer-item:hover {
+    background: #37373d;
+}
+
+.explorer-item:focus-visible {
+    outline: 2px solid #4ade80;
+    outline-offset: 2px;
+}
+
+/* Nested folders */
+.explorer-children {
+    margin-left: 14px;
+    padding-left: 8px;
+    border-left: 1px solid #404040;
+}
+
+/* Center editor */
+.development-editor {
+    min-width: 0;
+    background: #1e1e1e;
+}
+
+/* Editor tab/header */
+.editor-header {
+    padding: 14px 18px;
+    background: #2d2d2d;
+    border-bottom: 1px solid #363636;
+    color: #ffffff;
+}
+
+/* Editor body */
+.editor-content {
+    padding: 24px;
+    color: #9ca3af;
+}
+
+/* Small screens */
+@media (max-width: 768px) {
+    .development-workspace {
+        grid-template-columns: 1fr;
+    }
+
+    .development-explorer {
+        border-right: none;
+        border-bottom: 1px solid #363636;
+        max-height: 350px;
+        overflow-y: auto;
+    }
+}
+
+/* ============================================================
+   SOURCE CODE VIEWER
+   ============================================================ */
+
+/* Preserve indentation and line breaks in source code. */
+.source-code {
+    margin: 0;
+    padding: 20px;
+    overflow: auto;
+    white-space: pre;
+    color: #d4d4d4;
+    font-family: "Courier New", monospace;
+    font-size: 14px;
+    line-height: 1.6;
+    tab-size: 4;
+}
+
+/* Allow the editor to scroll when source code is long. */
+.editor-content {
+    min-height: 400px;
+    max-height: 650px;
+    overflow: auto;
+}
+
+/* Ensure the hidden attribute works despite other styles. */
+.source-code[hidden] {
+    display: none;
+}

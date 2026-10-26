@@ -24,6 +24,11 @@
         rel="stylesheet"
         href="{% static 'community/groups.css' %}"
     >
+        <!-- Development Room layout and file explorer styles. -->
+    <link
+        rel="stylesheet"
+        href="{% static 'community/development_room.css' %}"
+    >
 
 </head>
 
@@ -73,7 +78,25 @@
     ========================================= -->
 
     <main class="page-container">
+                <!-- ======================================== -->
+        <!-- DJANGO SUCCESS AND ERROR MESSAGES        -->
+        <!-- ======================================== -->
 
+        {% if messages %}
+
+            <div class="development-room-messages">
+
+                {% for message in messages %}
+
+                    <div class="message {{ message.tags }}">
+                        {{ message }}
+                    </div>
+
+                {% endfor %}
+
+            </div>
+
+        {% endif %}
         <!-- Back to group workspace. -->
         <a
             href="{% url 'group_detail' group.id %}"
@@ -93,6 +116,77 @@
                 <h1>
                     {{ group.name }} — Meeting Room
                 </h1>
+                <!-- ========================================== -->
+<!-- GITHUB REPOSITORY CONNECTION               -->
+<!-- ========================================== -->
+
+<section class="github-repository-section">
+
+    <h2>GitHub Repository</h2>
+
+    {% if repository %}
+
+        <!-- Display the connected repository -->
+        <div class="connected-repository">
+
+            <p>
+                <strong>Repository:</strong>
+                <a
+                    href="https://github.com/{{ repository.github_owner }}/{{ repository.repository_name }}"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                >
+                    {{ repository.github_owner }}/{{ repository.repository_name }}
+                </a>
+            </p>
+
+            <p>
+                <strong>Default Branch:</strong>
+                {{ repository.default_branch }}
+            </p>
+
+            <p class="repository-status">
+                Connected successfully
+            </p>
+
+        </div>
+
+    {% else %}
+
+        <p>No GitHub repository connected yet.</p>
+
+    {% endif %}
+
+    <!-- Only group owners and admins can connect repositories -->
+    {% if can_manage_repository %}
+
+        <form
+            method="POST"
+            action="{% url 'connect_group_repository' group.id %}"
+            class="repository-form"
+        >
+
+            {% csrf_token %}
+
+            <label for="{{ repository_form.repository_url.id_for_label }}">
+                GitHub Repository URL
+            </label>
+
+            {{ repository_form.repository_url }}
+
+            <button type="submit">
+                {% if repository %}
+                    Change Repository
+                {% else %}
+                    Connect Repository
+                {% endif %}
+            </button>
+
+        </form>
+
+    {% endif %}
+
+</section>
 
                 <p class="workspace-description">
                     Your team's private collaboration workspace.
@@ -101,6 +195,70 @@
             </div>
 
         </section>
+                <!-- ======================================== -->
+        <!-- GITHUB FILE EXPLORER                     -->
+        <!-- ======================================== -->
+
+        {% if repository %}
+
+            <section class="development-workspace">
+
+                <!-- Left sidebar: repository files -->
+                <aside class="development-explorer">
+
+                    <div class="explorer-header">
+
+                        <h2>Explorer</h2>
+
+                        <span>
+                            {{ repository.repository_name }}
+                        </span>
+
+                    </div>
+
+                    <!-- JavaScript will display GitHub files here. -->
+                    <div
+                        id="github-file-tree"
+                        data-files-url="{% url 'group_repository_files' group.id %}"
+                    >
+                        Loading repository files...
+                    </div>
+
+                </aside>
+
+                             <!-- Center panel: source code viewer -->
+                <section class="development-editor">
+
+                    <div class="editor-header">
+
+                        <span id="active-file-name">
+                            No file selected
+                        </span>
+
+                    </div>
+
+                    <div
+                        class="editor-content"
+                        id="editor-content"
+                        data-file-url="{% url 'group_repository_file_content' group.id %}"
+                    >
+
+                        <p id="editor-placeholder">
+                            Select a file from the explorer to open it.
+                        </p>
+
+                        <!-- Display source code without executing it. -->
+                        <pre
+                            id="source-code"
+                            class="source-code"
+                            hidden
+                        ><code id="source-code-text"></code></pre>
+
+                    </div>
+
+                </section>
+
+        {% endif %}
 
         <!-- ========================================
              5. MEETING ROOM FEATURES
@@ -167,6 +325,11 @@
         </section>
 
     </main>
+        <!-- Load the GitHub file explorer functionality. -->
+    <script
+        src="{% static 'community/development_room.js' %}"
+        defer
+    ></script>
 
 </body>
 

@@ -444,8 +444,18 @@ class GroupRepositoryForm(forms.Form):
                 "Use this format: https://github.com/owner/repository"
             )
 
+              # Extract the repository owner and name.
         owner, repository = parts
 
+        # Allow GitHub URLs ending with .git.
+        if repository.endswith(".git"):
+            repository = repository[:-4]
+
+        # Reject an empty repository name.
+        if not repository:
+            raise forms.ValidationError(
+                "Enter a valid GitHub repository name."
+            )
         # Reject encoded characters and invalid repository names.
         import re
 
