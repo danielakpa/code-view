@@ -138,3 +138,72 @@
 .source-code[hidden] {
     display: none;
 }
+
+/* ========================================
+   VS CODE-STYLE SOURCE CODE VIEWER
+======================================== */
+
+/* Arrange line numbers beside the source code. */
+.code-viewer {
+    display: flex;
+    align-items: flex-start;
+    width: max-content;
+    min-width: 100%;
+    font-family: monospace;
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+/* Keep the viewer hidden until a file is opened. */
+.code-viewer[hidden] {
+    display: none;
+}
+
+/* Style the line-number column. */
+.line-numbers {
+    flex-shrink: 0;
+    padding: 16px 12px;
+    margin: 0;
+    color: #858585;
+    text-align: right;
+    user-select: none;
+    border-right: 1px solid #333;
+}
+
+/* Style the actual source code. */
+.code-content {
+    padding: 16px;
+    margin: 0;
+    color: #d4d4d4;
+    white-space: pre;
+    tab-size: 4;
+}
+
+/* Allow scrolling when a code line is too long. */
+.editor-content {
+    overflow: auto;
+}
+
+/* ========================================
+   SYNTAX HIGHLIGHTING
+======================================== */
+
+/* Keep the editor background consistent. */
+.code-content,
+.code-content code {
+    background: transparent;
+}
+
+/* Preserve indentation and spacing. */
+.code-content code {
+    font-family: monospace;
+    white-space: pre;
+    tab-size: 4;
+}
+
+/* Prevent Prism's theme from changing our code layout. */
+.code-content[class*="language-"],
+.code-content code[class*="language-"] {
+    background: transparent;
+    text-shadow: none;
+}

@@ -29,6 +29,12 @@
         rel="stylesheet"
         href="{% static 'community/development_room.css' %}"
     >
+    <!-- Prism.js theme for code syntax highlighting -->
+
+    <link
+    rel="stylesheet"
+    href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css"
+>
 
 </head>
 
@@ -228,20 +234,30 @@
 
                 <!-- Center panel: code editor -->
                 <section class="development-editor">
+<!-- Container for displaying the selected GitHub file -->
+<div
+    class="editor-content"
+    id="editor-content"
+    data-file-url="{% url 'group_repository_file_content' group.id %}"
+>
 
-                    <div class="editor-header">
-                        <span id="active-file-name">
-                            No file selected
-                        </span>
-                    </div>
+    <!-- Message displayed before a file is opened -->
+    <p id="editor-placeholder">
+        Select a file from the explorer to open it.
+    </p>
 
-                    <div class="editor-content">
+    <!-- Display the selected file's source code -->
+<!-- Code viewer with VS Code-style line numbers -->
+<div id="source-code" class="code-viewer" hidden>
 
-                        <p>
-                            Select a file from the explorer to open it.
-                        </p>
+    <!-- Left side: line numbers -->
+    <pre id="line-numbers" class="line-numbers"></pre>
 
-                    </div>
+    <!-- Right side: actual source code -->
+    <pre class="code-content"><code id="source-code-text"></code></pre>
+
+</div>
+</div>
 
                 </section>
 
@@ -314,6 +330,19 @@
         </section>
 
     </main>
+    <!-- Prism.js: main syntax highlighting library -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+
+<!-- Programming language support -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-go.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-css.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-markup.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-json.min.js"></script>
+
+<!-- Our existing Development Room JavaScript -->
+<script src="{% static 'community/development_room.js' %}" defer></script>
         <!-- Load the GitHub file explorer functionality. -->
     <script
         src="{% static 'community/development_room.js' %}"

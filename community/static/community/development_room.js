@@ -166,9 +166,61 @@ document.addEventListener("DOMContentLoaded", async () => {
                         );
                     }
 
-                    // textContent displays code safely as plain text.
+                    // Display the GitHub source code safely.
                     sourceCodeText.textContent = data.content;
 
+                    // ========================================
+                    // SYNTAX HIGHLIGHTING
+                    // ========================================
+
+                    // Get the selected file's extension.
+                    const extension = file.name.split(".").pop().toLowerCase();
+
+                    // Match file extensions to programming languages.
+                    const languages = {
+                        py: "python",
+                        go: "go",
+                        js: "javascript",
+                        css: "css",
+                        html: "markup",
+                        json: "json",
+                    };
+
+                    // Identify the programming language.
+                    const language = languages[extension] || "none";
+
+                    // Remove the previous file's language class.
+                    sourceCodeText.className = "";
+
+                    // Apply the selected programming language.
+                    sourceCodeText.classList.add(`language-${language}`);
+
+                    // Highlight the code using Prism.js.
+                    if (window.Prism) {
+                        Prism.highlightElement(sourceCodeText);
+                    }
+
+                    // ========================================
+                    // LINE NUMBERS
+                    // ========================================
+
+                    // Find the line-number container.
+                    const lineNumbers = document.getElementById("line-numbers");
+
+                    // Split the source code into individual lines.
+                    const lines = data.content.split("\n");
+
+                    // Avoid adding an extra line number for a final newline.
+                    if (lines.length > 1 && lines[lines.length - 1] === "") {
+                        lines.pop();
+                    }
+
+                    // Generate line numbers starting from 1.
+                    if (lineNumbers) {
+                        lineNumbers.textContent = lines
+                            .map((_, index) => index + 1)
+                            .join("\n");
+                    }
                     // Hide the placeholder and show the code.
                     placeholder.hidden = true;
                     sourceCode.hidden = false;
