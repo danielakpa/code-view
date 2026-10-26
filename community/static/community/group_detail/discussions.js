@@ -45,9 +45,10 @@ document.addEventListener("DOMContentLoaded", () => {
                     // Convert the previous address into a URL object.
                     const previousURL = new URL(previousPage);
 
-                    // Only go back if the previous page belongs
-                    // to CodeView and is different from this page.
+                  // Go back only when browser history exists
+// and the previous page belongs to CodeView.
                     if (
+                        window.history.length > 1 &&
                         previousURL.origin === window.location.origin &&
                         previousURL.pathname !== window.location.pathname
                     ) {
@@ -180,6 +181,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 // Convert Django's JSON response into a JS object.
                 const data = await response.json();
+                // Confirm Django returned the expected Like information.
+        if (
+        typeof data.liked !== "boolean" ||
+        !Number.isInteger(data.like_count) ||
+        data.like_count < 0
+     ) {
+        throw new Error("Invalid response from the server.");
+    }
 
 
                 // ====================================================

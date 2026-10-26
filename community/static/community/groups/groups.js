@@ -53,8 +53,8 @@ document.addEventListener("DOMContentLoaded", () => {
         // Check each existing group.
         groupCards.forEach((card) => {
 
-            const groupName = card.dataset.groupName
-                .toLocaleLowerCase();
+            const groupName = (card.dataset.groupName || "")
+            .toLowerCase();
 
             // Check whether the group name contains the search.
             const matches = groupName.includes(searchText);

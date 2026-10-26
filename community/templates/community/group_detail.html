@@ -17,21 +17,24 @@
 
     <title>{{ group.name }} | CodeView</title>
 
-    <!-- Existing shared group styles. -->
-    <link
-        rel="stylesheet"
-        href="{% static 'community/groups.css' %}"
-    >
+<!-- Shared styles -->
+<link rel="stylesheet" href="{% static 'community/sheared.css' %}">
 
-    <!-- New group workspace styles. -->
-    <link
-        rel="stylesheet"
-        href="{% static 'community/group_detail.css' %}"
-    >
+<!-- Group Workspace -->
+<link rel="stylesheet" href="{% static 'community/group_detail/group_detail.css' %}">
+
+<!-- Discussions -->
+<link rel="stylesheet" href="{% static 'community/group_detail/group_discussions.css' %}">
+
+<!-- Group Chat -->
+<link rel="stylesheet" href="{% static 'community/group_detail/group_chat.css' %}">
+
+<!-- Members -->
+<link rel="stylesheet" href="{% static 'community/group_detail/group_members.css' %}">
 
 </head>
 
-<body>
+<body data-current-user-id="{{ request.user.id }}">
 
     <!-- ========================================
          2. TOP NAVIGATION
@@ -1371,26 +1374,14 @@
         We are keeping the existing file.
     -->
 <!-- Existing discussion interactions. -->
-<script
-    src="{% static 'community/discussions.js' %}"
-    defer
-></script>
+<script src="{% static 'community/group_detail/discussions.js' %}" defer></script>
 
-<!-- New workspace navigation. -->
-<script
-    src="{% static 'community/group_workspace.js' %}"
-    defer
-></script>
+<script src="{% static 'community/group_detail/group_workspace.js' %}" defer></script>
 
-<!-- Group Chat attachments and replies. -->
-<script
-    src="{% static 'community/group_chat.js' %}"
-    defer
-></script>
-<script
-    src="{% static 'community/developer_search.js' %}"
-    defer>
+<script src="{% static 'community/group_detail/group_chat.js' %}" defer></script>
+
+<script src="{% static 'community/group_detail/developer_search.js' %}" defer></script>
 </script>
 
-<body data-current-user-id="{{ request.user.id }}">
+<body>
 </html>

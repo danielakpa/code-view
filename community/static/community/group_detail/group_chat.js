@@ -155,31 +155,70 @@ document.addEventListener("DOMContentLoaded", function () {
         )?.value || "";
     }
 
-    // Submit an existing Django form without reloading.
-    async function submitForm(form) {
+// Submit a Django form without refreshing the page.
+async function submitForm(form) {
 
-        const response = await fetch(form.action, {
-            method: "POST",
-            body: new FormData(form),
-            credentials: "same-origin",
-            headers: {
-                "X-CSRFToken": getCSRFToken(form),
-                "X-Requested-With": "XMLHttpRequest"
-            }
-        });
+    // Send the form data to Django.
+    const response = await fetch(form.action, {
 
-        if (!response.ok) {
-            throw new Error(
-                `Request failed: ${response.status}`
-            );
+        method: "POST",
+
+        // Include all form fields and attachments.
+        body: new FormData(form),
+
+        // Include Django session cookies.
+        credentials: "same-origin",
+
+        headers: {
+
+            // Include Django's CSRF protection token.
+            "X-CSRFToken": getCSRFToken(form),
+
+            // Tell Django this is an AJAX request.
+            "X-Requested-With": "XMLHttpRequest"
         }
+    });
 
-        // IMPORTANT:
-        // The Django views will be updated next to return
-        // JSON for AJAX requests. For now, redirects may
-        // still appear successful even when validation fails.
-        return response;
+    // Reject unsuccessful HTTP responses.
+    if (!response.ok) {
+
+        throw new Error(
+            `Request failed: ${response.status}`
+        );
     }
+
+    // Reject redirects instead of treating them as success.
+    if (response.redirected) {
+
+        throw new Error(
+            "Django redirected the request instead of returning JSON."
+        );
+    }
+
+    // Confirm Django returned JSON.
+    const contentType = response.headers.get("content-type") || "";
+
+    if (!contentType.includes("application/json")) {
+
+        throw new Error(
+            "Expected a JSON response from Django."
+        );
+    }
+
+    // Read Django's response.
+    const result = await response.json();
+
+    // Confirm Django accepted the action.
+    if (result.success !== true) {
+
+        throw new Error(
+            result.error || "The request was not successful."
+        );
+    }
+
+    // Return the validated result.
+    return result;
+}
 
     // Create a CSRF input for dynamically generated forms.
     function addCSRFToken(form) {

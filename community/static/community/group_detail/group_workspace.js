@@ -35,6 +35,10 @@ document.addEventListener("DOMContentLoaded", function () {
     // ========================================
 
     function switchTab(tabName) {
+        // Only allow the three supported workspace tabs.
+        if (!["discussions", "chat", "members"].includes(tabName)) {
+        return;
+    } 
 
         // Check whether the selected section exists.
         if (tabName === "chat" && !chatSection) {
@@ -179,13 +183,12 @@ document.addEventListener("DOMContentLoaded", function () {
             // Get the selected tab name.
             const tabName = tab.dataset.workspaceTab;
 
-            // Update the URL without reloading.
-            window.history.replaceState(
-                null,
-                "",
-                tab.getAttribute("href")
-            );
-
+           // Add the selected tab to browser history.
+        window.history.pushState(
+            null,
+            "",
+            tab.getAttribute("href")
+        );
             // Display the selected section.
             switchTab(tabName);
 
@@ -198,9 +201,15 @@ document.addEventListener("DOMContentLoaded", function () {
     // HANDLE BROWSER BACK/FORWARD HASH CHANGES
     // ========================================
 
-    window.addEventListener("hashchange", function () {
-        switchTab(getTabFromURL());
-    });
+    // Handle Back and Forward navigation.
+window.addEventListener("popstate", function () {
+    switchTab(getTabFromURL());
+});
+
+// Handle hash changes from normal links.
+window.addEventListener("hashchange", function () {
+    switchTab(getTabFromURL());
+});
 
 
     // ========================================
@@ -228,6 +237,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
     // Store the form belonging to the selected developer.
     let selectedRemoveForm = null;
+    // Remember the button that opened the modal.
+    let removeTriggerButton = null;
 
     if (removeModal && cancelRemoveButton && confirmRemoveButton) {
 
@@ -246,6 +257,10 @@ document.addEventListener("DOMContentLoaded", function () {
 
                 // Remember which developer should be removed.
                 selectedRemoveForm = form;
+                // Remember the button that opened the confirmation.
+removeTriggerButton = event.submitter || form.querySelector(
+    'button[type="submit"]'
+);
 
                 // Display the confirmation modal.
                 removeModal.hidden = false;
@@ -258,14 +273,20 @@ document.addEventListener("DOMContentLoaded", function () {
         });
 
         // Close the modal without removing the developer.
-        function closeRemoveModal() {
+function closeRemoveModal() {
 
-            removeModal.hidden = true;
+    // Hide the confirmation modal.
+    removeModal.hidden = true;
 
-            // Clear the selected form.
-            selectedRemoveForm = null;
+    // Return keyboard focus to the Remove button.
+    if (removeTriggerButton) {
+        removeTriggerButton.focus();
+    }
 
-        }
+    // Clear the selected form and button.
+    selectedRemoveForm = null;
+    removeTriggerButton = null;
+}
 
         // Cancel removal.
         cancelRemoveButton.addEventListener("click", function () {
@@ -341,10 +362,20 @@ document.addEventListener("DOMContentLoaded", function () {
             cancelLeaveButton.focus();
         });
 
-        // Close the modal without leaving the group.
-        function closeLeaveModal() {
-            leaveModal.hidden = true;
-        }
+       function closeLeaveModal() {
+
+    // Hide the confirmation modal.
+    leaveModal.hidden = true;
+
+    // Return focus to the Leave Group button.
+    const leaveButton = leaveForm.querySelector(
+        'button[type="submit"]'
+    );
+
+    if (leaveButton) {
+        leaveButton.focus();
+    }
+}
 
         // Cancel leaving.
         cancelLeaveButton.addEventListener("click", closeLeaveModal);

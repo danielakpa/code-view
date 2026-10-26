@@ -8,8 +8,14 @@ document.addEventListener("DOMContentLoaded", function () {
     if (!searchInput || !resultsBox) return;
 
     // Get the Django search URL from the HTML input.
-    const searchURL = searchInput.dataset.searchUrl;
+// Get the Django search endpoint.
+const searchURL = searchInput.dataset.searchUrl;
 
+// Stop if Django did not provide a search URL.
+if (!searchURL) {
+    console.error("Developer search URL is missing.");
+    return;
+}
     let searchTimer;
     let controller;
 
@@ -48,6 +54,11 @@ document.addEventListener("DOMContentLoaded", function () {
 
                 // Convert Django's JSON response into JavaScript data.
                 const data = await response.json();
+                
+                // Confirm Django returned a list of developers.
+            if (!Array.isArray(data.users)) {
+            throw new Error("Invalid developer search response.");
+         }
 
                 // Ignore results from an outdated search.
                 if (searchInput.value.trim() !== query) return;
@@ -82,14 +93,18 @@ document.addEventListener("DOMContentLoaded", function () {
 
                 });
 
-            } catch (error) {
+          } catch (error) {
 
-                // Ignore cancelled searches.
-                if (error.name === "AbortError") return;
+    // Ignore cancelled searches.
+    if (error.name === "AbortError") return;
 
-                resultsBox.textContent = "Unable to search developers.";
+    // Ignore errors from searches that are no longer current.
+    if (searchInput.value.trim() !== query) return;
 
-            }
+    // Inform the administrator that the search failed.
+    resultsBox.textContent = "Unable to search developers.";
+
+}
 
         }, 250);
 

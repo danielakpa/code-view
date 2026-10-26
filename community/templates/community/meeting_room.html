@@ -10,10 +10,8 @@
     <title>{{ group.name }} Meeting Room | CodeView</title>
 
     <!-- Existing stylesheets -->
-    <link rel="stylesheet" href="{% static 'community/groups.css' %}">
-    <link rel="stylesheet" href="{% static 'community/development_room.css' %}">
-
-    <!-- Syntax highlighting -->
+<link rel="stylesheet" href="{% static 'community/sheared.css' %}">
+<link rel="stylesheet" href="{% static 'community/meeting_room/meeting_room.css' %}">    <!-- Syntax highlighting -->
     <link
         rel="stylesheet"
         href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css"
@@ -522,11 +520,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-json.min.js"></script>
 
     <!-- Load our existing JavaScript only once -->
-    <script
-        src="{% static 'community/development_room.js' %}"
-        defer
-    ></script>
-
+<script src="{% static 'community/meeting_room/meeting_room.js' %}" defer></script>
 </body>
 
 </html>

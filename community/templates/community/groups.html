@@ -9,8 +9,17 @@
 
     <title>Project Groups | CodeView</title>
 
-    <!-- Existing stylesheet -->
-    <link rel="stylesheet" href="{% static 'community/groups.css' %}">
+  <!-- Shared CodeView styling -->
+<link
+    rel="stylesheet"
+    href="{% static 'community/sheared.css' %}"
+>
+
+<!-- Groups page styling -->
+<link
+    rel="stylesheet"
+    href="{% static 'community/groups/groups.css' %}"
+>
 </head>
 
 <body>
@@ -359,9 +368,10 @@
         </section>
 
     </main>
-
-    <!-- Existing file names are unchanged -->
- 
-
+<!-- Load the Groups page JavaScript -->
+<script
+    src="{% static 'community/groups/groups.js' %}"
+    defer
+></script>
 </body>
 </html>

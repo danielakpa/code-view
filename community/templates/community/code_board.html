@@ -19,17 +19,11 @@
         Code Board | {{ group.name }} | CodeView
     </title>
 
-    <!-- Reuse CodeView's existing stylesheet. -->
-    <link
-        rel="stylesheet"
-        href="{% static 'community/groups.css' %}"
-    >
+   <!-- Shared styles -->
+<link rel="stylesheet" href="{% static 'community/sheared.css' %}">
 
-    <!-- Code Board stylesheet. -->
-    <link
-        rel="stylesheet"
-        href="{% static 'community/code_board.css' %}"
-    >
+<!-- Code Board styles -->
+<link rel="stylesheet" href="{% static 'community/code_board/code_board.css' %}">
 
 </head>
 
