@@ -125,6 +125,89 @@
             </div>
 
         </section>
+                      <!-- ========================================
+             GITHUB REPOSITORY INFORMATION
+        ========================================= -->
+
+        <section class="code-board-repository">
+
+            {% if repository %}
+
+                <!-- Display the connected GitHub repository. -->
+                <h2>
+                    Connected GitHub Repository
+                </h2>
+
+                <p>
+                    Repository:
+                    <strong>
+                        {{ repository.github_owner }}/{{ repository.repository_name }}
+                    </strong>
+                </p>
+
+                <!-- Display the repository's default branch. -->
+                <p>
+                    Default Branch:
+                    <strong>
+                        {{ repository.default_branch }}
+                    </strong>
+                </p>
+
+                <!-- ====================================
+                     GITHUB BRANCH SELECTOR
+                ==================================== -->
+
+                <div class="branch-selector">
+
+                    <!-- Label for the branch dropdown. -->
+                    <label for="github-branch">
+                        Select Your Branch
+                    </label>
+
+                    <!-- Display available GitHub branches. -->
+                    <select
+                        id="github-branch"
+                        name="github_branch"
+                    >
+
+                        {% for branch in branches %}
+
+                            <option
+                                value="{{ branch }}"
+                                {% if branch == repository.default_branch %}selected{% endif %}
+                            >
+                                {{ branch }}
+                            </option>
+
+                        {% endfor %}
+
+                    </select>
+                    <!-- ====================================
+     CREATE GITHUB BRANCH BUTTON
+==================================== -->
+
+<button
+    type="button"
+    class="create-branch-btn"
+    id="create-branch-btn"
+    disabled
+    title="GitHub authorization is required before creating branches"
+>
+    + New Branch
+</button>
+
+                </div>
+
+            {% else %}
+
+                <!-- Display this when no repository is connected. -->
+                <p>
+                    No GitHub repository has been connected to this group.
+                </p>
+
+            {% endif %}
+
+        </section>
 
         <!-- ========================================
              5. CODE EDITOR FORM

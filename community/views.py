@@ -1239,16 +1239,65 @@ def code_board(request, group_id):
             group_id=group.id,
         )
 
+       # Find the GitHub repository connected to this private group.
+    repository = GroupRepository.objects.filter(
+        group=group,
+    ).first()
+        # Prepare an empty list for GitHub branches.
+    branches = []
+
+    # Retrieve branches only when a repository is connected.
+    if repository:
+
+        # Build the GitHub API endpoint for repository branches.
+        github_url = (
+            f"https://api.github.com/repos/"
+            f"{repository.github_owner}/"
+            f"{repository.repository_name}/branches?per_page=100"
+        )
+
+        # Create a request with GitHub's recommended headers.
+        github_request = Request(
+            github_url,
+            headers={
+                "Accept": "application/vnd.github+json",
+                "User-Agent": "CodeView",
+            },
+        )
+
+        try:
+
+            # Request the branch list from GitHub.
+            with urlopen(github_request, timeout=10) as response:
+                branches_data = json.load(response)
+
+            # Extract each branch name.
+            branches = [
+                branch["name"]
+                for branch in branches_data
+            ]
+
+        except (HTTPError, URLError, TimeoutError, ValueError, KeyError):
+
+            # Keep the Code Board available if GitHub fails.
+            branches = []
+
+    # Use the default branch when GitHub returns no branches.
+    if repository and not branches:
+        branches = [repository.default_branch]
+
+    # Send the group, existing board, and repository to the HTML page.
+        # Render the Code Board with the available GitHub branches.
     return render(
         request,
         "community/code_board.html",
         {
             "group": group,
             "board": board,
+            "repository": repository,
+            "branches": branches,
         },
     )
-
-
 # ============================================================
 # 10. CREATE GROUP DISCUSSION
 # ============================================================
