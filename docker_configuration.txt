@@ -1,0 +1,208 @@
+========================================================
+CODEVIEW - DOCKER INSTALLATION GUIDE FOR UBUNTU
+========================================================
+
+PURPOSE:
+Install Docker Engine on Ubuntu to prepare the
+CodeView isolated terminal execution environment.
+
+NOTE:
+Run these commands one after another.
+Docker only needs to be installed once unless
+your computer resets and removes installed software.
+
+
+========================================================
+STEP 1 - UPDATE UBUNTU PACKAGE LIST
+========================================================
+
+sudo apt update
+
+Meaning:
+Refreshes Ubuntu's list of available software packages.
+
+
+========================================================
+STEP 2 - INSTALL REQUIRED TOOLS
+========================================================
+
+sudo apt install -y ca-certificates curl
+
+Meaning:
+Installs tools needed to download Docker securely.
+
+
+========================================================
+STEP 3 - CREATE DOCKER KEY DIRECTORY
+========================================================
+
+sudo install -m 0755 -d /etc/apt/keyrings
+
+Meaning:
+Creates a folder for package-signing keys.
+
+
+========================================================
+STEP 4 - DOWNLOAD DOCKER SIGNING KEY
+========================================================
+
+sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
+    -o /etc/apt/keyrings/docker.asc
+
+Meaning:
+Downloads Docker's official signing key.
+
+
+========================================================
+STEP 5 - SET KEY PERMISSIONS
+========================================================
+
+sudo chmod a+r /etc/apt/keyrings/docker.asc
+
+Meaning:
+Allows Ubuntu's package manager to read the key.
+
+
+========================================================
+STEP 6 - ADD DOCKER REPOSITORY
+========================================================
+
+sudo tee /etc/apt/sources.list.d/docker.sources > /dev/null <<EOF
+Types: deb
+URIs: https://download.docker.com/linux/ubuntu
+Suites: $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}")
+Components: stable
+Architectures: $(dpkg --print-architecture)
+Signed-By: /etc/apt/keyrings/docker.asc
+EOF
+
+Meaning:
+Adds Docker's official software repository to Ubuntu.
+
+
+========================================================
+STEP 7 - UPDATE PACKAGE LIST AGAIN
+========================================================
+
+sudo apt update
+
+Meaning:
+Loads package information from Docker's repository.
+
+
+========================================================
+STEP 8 - INSTALL DOCKER ENGINE
+========================================================
+
+sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+
+Meaning:
+Installs Docker Engine and its supporting tools.
+
+
+========================================================
+STEP 9 - START DOCKER SERVICE
+========================================================
+
+sudo systemctl enable --now docker
+
+Meaning:
+Starts Docker immediately and enables automatic startup.
+
+
+========================================================
+STEP 10 - CHECK DOCKER VERSION
+========================================================
+
+sudo docker --version
+
+Meaning:
+Confirms Docker is installed.
+
+
+========================================================
+STEP 11 - TEST DOCKER
+========================================================
+
+sudo docker run --rm hello-world
+
+Meaning:
+Downloads and runs a small test container.
+
+Expected output:
+
+Hello from Docker!
+
+
+========================================================
+USEFUL DOCKER COMMANDS
+========================================================
+
+1. Check Docker version:
+
+sudo docker --version
+
+
+2. Check Docker information:
+
+sudo docker info
+
+
+3. Start Docker:
+
+sudo systemctl start docker
+
+
+4. Stop Docker:
+
+sudo systemctl stop docker
+
+
+5. Restart Docker:
+
+sudo systemctl restart docker
+
+
+6. List running containers:
+
+sudo docker ps
+
+
+7. List all containers:
+
+sudo docker ps -a
+
+
+8. List downloaded Docker images:
+
+sudo docker images
+
+
+9. Check Docker Compose:
+
+sudo docker compose version
+
+
+========================================================
+IMPORTANT NOTES
+========================================================
+
+1. Do not reinstall Docker if it is already installed.
+
+2. If your student computer resets and removes Docker,
+   follow the installation steps again.
+
+3. Keep this file in your GitHub repository.
+
+4. Docker Engine is installed on the computer, not
+   inside your Python virtual environment (venv).
+
+5. Docker alone is not a sufficient security boundary
+   for running untrusted developer code.
+
+6. CodeView will require stronger sandbox isolation,
+   private workspaces, and resource limits.
+
+========================================================
+END OF INSTALLATION GUIDE
+========================================================
