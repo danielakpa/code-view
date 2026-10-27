@@ -67,3 +67,10 @@ Implement complete features in stages with maintainable, modular code.
 Design for future infrastructure growth without major architectural rewrites.
 Develop locally with open-source tools; production infrastructure,
 AI usage, video bandwidth, and code execution will incur operating costs.
+
+
+
+
+
+
+sudo docker pull ghcr.io/danielakpa/codeview-developer:dev
