@@ -153,3 +153,72 @@ class GroupDiscussionConsumer(AsyncJsonWebsocketConsumer):
             group_id=self.group_id,
             user=self.user,
         ).exists()
+
+class TerminalConsumer(AsyncJsonWebsocketConsumer):
+    """Handle private terminal WebSocket connections."""
+
+    async def connect(self):
+        """Authenticate the developer before connecting."""
+
+        # Get the logged-in developer.
+        self.user = self.scope["user"]
+
+        # Get the group ID from the WebSocket URL.
+        self.group_id = self.scope["url_route"]["kwargs"]["group_id"]
+
+        # Reject developers who are not logged in.
+        if not self.user.is_authenticated:
+            await self.close(code=4401)
+            return
+
+        # Verify that the developer belongs to a private group.
+        is_allowed = await self.check_terminal_access()
+
+        # Reject unauthorized developers.
+        if not is_allowed:
+            await self.close(code=4403)
+            return
+
+        # Accept the private WebSocket connection.
+        await self.accept()
+
+        # Notify the browser that the connection is ready.
+        await self.send_json({
+            "type": "terminal_connected",
+            "message": "CodeView terminal connection established.",
+        })
+
+    async def receive_json(self, content, **kwargs):
+        """Receive terminal messages without executing commands."""
+
+        # Terminal execution is not implemented yet.
+        await self.send_json({
+            "type": "terminal_info",
+            "message": "Secure terminal runner is not connected yet.",
+        })
+
+    async def disconnect(self, close_code):
+        """Handle terminal disconnection."""
+
+        # The runner will be cleaned up here in a later step.
+        pass
+
+    @database_sync_to_async
+    def check_terminal_access(self):
+        """Check private-group membership in PostgreSQL."""
+
+        # Import the existing membership helper.
+        from .views import is_group_member
+
+        # Find the requested private group.
+        group = ProjectGroup.objects.filter(
+            id=self.group_id,
+            is_private=True,
+        ).first()
+
+        # Reject nonexistent or public groups.
+        if group is None:
+            return False
+
+        # Allow only developers belonging to this group.
+        return is_group_member(group, self.user)

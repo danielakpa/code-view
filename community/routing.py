@@ -27,4 +27,10 @@ websocket_urlpatterns = [
         consumers.GroupDiscussionConsumer.as_asgi(),
     ),
 
+        # Private interactive terminal for each developer.
+    re_path(
+        r"^ws/groups/(?P<group_id>\d+)/terminal/$",
+        consumers.TerminalConsumer.as_asgi(),
+    ),
+
 ]
