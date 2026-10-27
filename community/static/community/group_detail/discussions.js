@@ -269,5 +269,327 @@ document.addEventListener("DOMContentLoaded", () => {
         });
 
     });
+        // ====================================================
+    // 11. SUBMIT COMMENTS AND REPLIES WITHOUT REFRESHING
+    // ====================================================
+
+    // Listen for submissions from comment and reply forms.
+    document.addEventListener("submit", async function(event) {
+
+        // Find the comment or reply form being submitted.
+        const form = event.target.closest(
+            "#comments-section form, #discussion-comments form"
+        );
+
+        // Ignore unrelated forms.
+        if (!form) {
+            return;
+        }
+
+        // Stop the browser from refreshing.
+        event.preventDefault();
+
+        // Find the submit button.
+        const button = form.querySelector('button[type="submit"]');
+
+        // Prevent duplicate submissions.
+        if (button && button.disabled) {
+            return;
+        }
+
+        if (button) {
+            button.disabled = true;
+        }
+
+        try {
+
+            // Collect comment content, CSRF token, and parent ID.
+            const formData = new FormData(form);
+
+            // Send the comment to Django.
+            const response = await fetch(form.action, {
+                method: "POST",
+                body: formData,
+                headers: {
+                    "X-Requested-With": "XMLHttpRequest"
+                }
+            });
+
+// Read Django's JSON response.
+const data = await response.json();
+
+// Check whether Django rejected the comment.
+if (!response.ok || !data.success) {
+
+    // Get the error message returned by Django.
+    const errorMessage =
+        data.error || "Unable to post comment.";
+
+    // Display the error using the existing catch block.
+    throw new Error(errorMessage);
+}
+
+            // Clear the comment box after successful submission.
+            form.reset();
+
+            // The WebSocket will display the saved comment.
+
+        } catch (error) {
+
+            console.error("CodeView comment error:", error);
+
+            alert(error.message);
+
+        } finally {
+
+            // Allow another comment submission.
+            if (button) {
+                button.disabled = false;
+            }
+        }
+    });
+
+    // ====================================================
+    // 12. REAL-TIME DISCUSSION LIKE UPDATES
+    // ====================================================
+
+    // Find the group ID from the discussion WebSocket URL.
+    const discussionSocketUrl = document.body.dataset.discussionSocketUrl;
+
+    // Only connect on pages that provide a WebSocket URL.
+    if (discussionSocketUrl) {
+
+        // Open a WebSocket connection.
+        const socket = new WebSocket(discussionSocketUrl);
+
+        // Listen for updates from Django Channels.
+        socket.addEventListener("message", function(event) {
+
+            // Convert the received JSON into a JavaScript object.
+            const data = JSON.parse(event.data);
+
+            // Check what Django Channels sends to the browser.
+        console.log("CodeView WebSocket received:", data);
+
+            // ====================================================
+// 13. RECEIVE REAL-TIME DISCUSSION COMMENTS
+// ====================================================
+
+// Check whether Django Channels sent a new comment.
+if (data.event === "discussion_comment") {
+        // ====================================================
+    // UPDATE THE DISCUSSION COMMENT COUNT
+    // ====================================================
+
+    
+    // Find the comment count for this discussion.
+    const commentCountElement = document.getElementById(
+        "comment-count-" + data.discussion_id
+    );
+
+    // Check that Django sent a valid comment count.
+    if (
+        commentCountElement &&
+        Number.isInteger(data.comment_count) &&
+        data.comment_count >= 0
+    ) {
+
+        // Update the count without refreshing.
+        commentCountElement.textContent = data.comment_count;
+    }
+
+    // Find the comments section on the discussion page.
+    const commentsSection = document.getElementById(
+        "discussion-comments"
+    );
+
+    // The group workspace does not display full comments.
+    if (!commentsSection) {
+        return;
+    }
+
+    // ====================================================
+// REMOVE THE EMPTY COMMENTS MESSAGE
+// ====================================================
+
+// Find the paragraphs inside the comments section.
+const paragraphs = commentsSection.querySelectorAll(
+    "p.group-description"
+);
+
+// Check each paragraph.
+paragraphs.forEach(function(paragraph) {
+
+    // Get the paragraph text without extra spaces.
+    const text = paragraph.textContent.trim();
+
+    // Remove the empty-state messages.
+    if (
+        text === "No comments yet." ||
+        text === "Be the first to comment!"
+    ) {
+        paragraph.remove();
+    }
+});
+
+    // Avoid displaying the same comment twice.
+    if (document.getElementById("comment-" + data.comment_id)) {
+        return;
+    }
+
+    // Create a new comment card.
+    const commentCard = document.createElement("article");
+
+    commentCard.className = "group-card discussion-comment";
+    commentCard.id = "comment-" + data.comment_id;
+
+    // Show the parent author when this is a reply.
+    if (data.parent_id && data.parent_author) {
+
+        const replyIndicator = document.createElement("p");
+        replyIndicator.className = "reply-indicator";
+
+        replyIndicator.textContent =
+            "↳ Replying to " + data.parent_author;
+
+        commentCard.appendChild(replyIndicator);
+    }
+
+    // Display the comment author and date.
+    const authorElement = document.createElement("p");
+    authorElement.className = "group-owner";
+
+    authorElement.textContent =
+        data.author + " · " + data.created_at;
+
+    commentCard.appendChild(authorElement);
+
+    // Display the comment content safely.
+    const contentElement = document.createElement("p");
+    contentElement.className = "group-description";
+
+    contentElement.textContent = data.content;
+    contentElement.style.whiteSpace = "pre-wrap";
+
+    commentCard.appendChild(contentElement);
+
+
+    // ====================================================
+// CREATE A REPLY FORM FOR THE NEW COMMENT
+// ====================================================
+
+// Find the existing comment form to reuse its URL and CSRF token.
+const originalForm = document.querySelector(
+    "#comments-section form"
+);
+
+// Only group members have permission to reply.
+if (originalForm) {
+
+    // Create a new reply form.
+    const replyForm = document.createElement("form");
+
+    replyForm.method = "POST";
+    replyForm.action = originalForm.action;
+
+    // Copy the CSRF token from the existing form.
+    const csrfToken = originalForm.querySelector(
+        'input[name="csrfmiddlewaretoken"]'
+    );
+
+    if (csrfToken) {
+        replyForm.appendChild(csrfToken.cloneNode(true));
+    }
+
+    // Identify which comment the developer is replying to.
+    const parentInput = document.createElement("input");
+
+    parentInput.type = "hidden";
+    parentInput.name = "parent_id";
+    parentInput.value = data.comment_id;
+
+    replyForm.appendChild(parentInput);
+
+    // Create a label for the reply box.
+    const replyLabel = document.createElement("label");
+
+    replyLabel.htmlFor = "reply-" + data.comment_id;
+    replyLabel.textContent = "Reply to " + data.author;
+
+    replyForm.appendChild(replyLabel);
+
+    // Create the reply text box.
+    const replyTextarea = document.createElement("textarea");
+
+    replyTextarea.id = "reply-" + data.comment_id;
+    replyTextarea.name = "content";
+    replyTextarea.className = "group-textarea";
+    replyTextarea.rows = 2;
+    replyTextarea.maxLength = 2000;
+    replyTextarea.placeholder = "Write a reply...";
+    replyTextarea.required = true;
+
+    replyForm.appendChild(replyTextarea);
+
+    // Create the Reply button.
+    const replyButton = document.createElement("button");
+
+    replyButton.type = "submit";
+    replyButton.className = "group-action";
+    replyButton.textContent = "Reply";
+
+    replyForm.appendChild(replyButton);
+
+    // Display the reply form inside the new comment card.
+    commentCard.appendChild(replyForm);
+}
+
+// Find the first existing comment.
+const firstComment = commentsSection.querySelector(
+    ".discussion-comment"
+);
+
+// Insert the new comment before existing comments.
+if (firstComment) {
+
+    commentsSection.insertBefore(
+        commentCard,
+        firstComment
+    );
+
+} else {
+
+    // If there are no comments, add the first comment.
+    commentsSection.appendChild(commentCard);
+}
+
+    return;
+}
+
+            // Ignore events that are not discussion Like updates.
+            if (data.event !== "discussion_like") {
+                return;
+            }
+
+            // Find the discussion whose Like count changed.
+            const countElement = document.getElementById(
+                "like-count-" + data.discussion_id
+            ) || document.getElementById("like-count");
+
+            // Validate the received count.
+            if (
+                !Number.isInteger(data.like_count) ||
+                data.like_count < 0
+            ) {
+                return;
+            }
+
+            // Update the total number of likes.
+            if (countElement) {
+                countElement.textContent = data.like_count;
+            }
+
+        });
+    }
 
 });

@@ -34,8 +34,10 @@
 
 </head>
 
-<body data-current-user-id="{{ request.user.id }}">
-
+<body
+    data-current-user-id="{{ request.user.id }}"
+    data-discussion-socket-url="{% if request.is_secure %}wss{% else %}ws{% endif %}://{{ request.get_host }}/ws/groups/{{ group.id }}/discussions/"
+>
     <!-- ========================================
          2. TOP NAVIGATION
     ========================================= -->
@@ -592,9 +594,12 @@
                                     likes
                                 </span>
 
-                                <span>
-                                    💬 {{ discussion.comment_count }} comments
-                                </span>
+                               <!-- Display the discussion's comment count. -->
+
+                        <span id="comment-count-{{ discussion.id }}">
+                            {{ discussion.comment_count }}
+                            </span>
+                            comments
 
                             </div>
 

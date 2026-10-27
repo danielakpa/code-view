@@ -44,6 +44,8 @@ from django.contrib import messages
 # Allows multiple database operations to succeed or fail together.
 from django.db import transaction
 
+
+
 # Q builds complex database filters; Count counts matching records.
 from django.db.models import Q, Count
 
@@ -1398,7 +1400,7 @@ def discussion_detail(request, group_id, discussion_id):
         GroupDiscussionComment.objects
         .filter(discussion=discussion)
         .select_related("author", "parent")
-        .order_by("created_at", "id")
+        .order_by("created_at", "-id")
     )
 
     liked_by_user = GroupDiscussionLike.objects.filter(
@@ -1448,8 +1450,22 @@ def add_discussion_comment(request, group_id, discussion_id):
 
     form = GroupDiscussionCommentForm(request.POST)
 
+    # Check whether the submitted comment is valid.
     if not form.is_valid():
 
+        # Return JSON when JavaScript submits the form.
+        if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+
+            return JsonResponse(
+                {
+                    "success": False,
+                    "error": "Please enter a valid comment.",
+                    "errors": form.errors.get_json_data(),
+                },
+                status=400,
+            )
+
+        # Keep normal form submissions working.
         messages.error(
             request,
             "Please enter a valid comment.",
@@ -1485,21 +1501,70 @@ def add_discussion_comment(request, group_id, discussion_id):
         # Save the developer's comment in PostgreSQL.
     comment.save()
 
-    # Return to the discussion without displaying
-    # a success notification.
+        # Count all comments and replies in this discussion.
+    comment_count = GroupDiscussionComment.objects.filter(
+        discussion=discussion
+    ).count()
+
+        # Get the Django Channels connection.
+    channel_layer = get_channel_layer()
+
+    # Prepare the new comment information.
+    event = {
+        "type": "discussion.comment",
+        "data": {
+            "event": "discussion_comment",
+            "discussion_id": discussion.id,
+            "comment_count": comment_count,
+            "comment_id": comment.id,
+            "author": request.user.username,
+            "content": comment.content,
+            "parent_id": comment.parent_id,
+            "parent_author": (
+                comment.parent.author.username
+                if comment.parent_id
+                else None
+            ),
+            "created_at": comment.created_at.strftime(
+                "%b %d, %Y - %H:%M"
+            ),
+        },
+    }
+
+    # Send the comment to connected group members.
+    def broadcast_comment():
+        if channel_layer is not None:
+            async_to_sync(channel_layer.group_send)(
+                f"group_discussions_{group.id}",
+                event,
+            )
+
+    # Broadcast after PostgreSQL commits the comment.
+    transaction.on_commit(broadcast_comment)
+
+    # Return JSON when JavaScript submits a comment or reply.
+    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+
+        return JsonResponse({
+            "success": True,
+            "comment_id": comment.id,
+        })
+
+    # Keep normal form submissions working.
     return redirect(
         "discussion_detail",
         group_id=group.id,
         discussion_id=discussion.id,
     )
 
-# ============================================================
+## ============================================================
 # 13. LIKE OR UNLIKE DISCUSSION
 # ============================================================
+
 @login_required
 @require_POST
 def toggle_discussion_like(request, group_id, discussion_id):
-    """Like or unlike a discussion without refreshing the page."""
+    """Like or unlike a discussion and broadcast the updated count."""
 
     # 1. Find the group.
     group = get_object_or_404(
@@ -1533,7 +1598,7 @@ def toggle_discussion_like(request, group_id, discussion_id):
             pk=request.user.pk
         )
 
-        # Check whether the developer already liked this post.
+        # Check whether the developer already liked this discussion.
         existing_like = GroupDiscussionLike.objects.filter(
             discussion=discussion,
             user=request.user,
@@ -1543,6 +1608,8 @@ def toggle_discussion_like(request, group_id, discussion_id):
 
             # Remove the existing like.
             existing_like.delete()
+
+            # The developer no longer likes the discussion.
             liked = False
 
         else:
@@ -1552,6 +1619,8 @@ def toggle_discussion_like(request, group_id, discussion_id):
                 discussion=discussion,
                 user=request.user,
             )
+
+            # The developer now likes the discussion.
             liked = True
 
         # Count the total likes after the change.
@@ -1559,15 +1628,57 @@ def toggle_discussion_like(request, group_id, discussion_id):
             discussion=discussion,
         ).count()
 
-    # 5. Return JSON when JavaScript sends the request.
+    # ========================================================
+    # 5. BROADCAST THE UPDATED LIKE COUNT
+    # ========================================================
+
+    # Get the Django Channels layer.
+    channel_layer = get_channel_layer()
+
+    # Prepare the information to send to connected developers.
+    event = {
+        "type": "discussion.like",
+        "data": {
+            "event": "discussion_like",
+            "discussion_id": discussion.id,
+            "like_count": like_count,
+        },
+    }
+
+    # Send the update to developers viewing this group.
+    def broadcast_like():
+
+        # Broadcast only if a channel layer is available.
+        if channel_layer is not None:
+
+            # Call the asynchronous Channels method
+            # from this synchronous Django view.
+            async_to_sync(channel_layer.group_send)(
+                f"group_discussions_{group.id}",
+                event,
+            )
+
+    # Broadcast after the database transaction commits.
+    transaction.on_commit(broadcast_like)
+
+    # ========================================================
+    # 6. RETURN JSON FOR JAVASCRIPT
+    # ========================================================
+
+    # Check whether JavaScript submitted the Like request.
     if request.headers.get("X-Requested-With") == "XMLHttpRequest":
 
+        # Return the developer's Like status and total likes.
         return JsonResponse({
             "liked": liked,
             "like_count": like_count,
         })
 
-    # 6. If JavaScript is not used, return to the discussion.
+    # ========================================================
+    # 7. HANDLE NORMAL FORM SUBMISSIONS
+    # ========================================================
+
+    # Return to the discussion if JavaScript is not used.
     return redirect(
         "discussion_detail",
         group_id=group.id,

@@ -32,8 +32,10 @@
 
 </head>
 
-<body>
-
+<!-- Connect this discussion page to real-time updates. -->
+<body
+    data-discussion-socket-url="{% if request.is_secure %}wss{% else %}ws{% endif %}://{{ request.get_host }}/ws/groups/{{ group.id }}/discussions/"
+>
     <!-- ========================================
          3. TOP NAVIGATION
     ========================================= -->
@@ -359,8 +361,11 @@
             class="members-section"
         >
 
-            <h2>Comments &amp; Replies</h2>
-
+<!-- Display the total number of comments and replies. -->
+<h2>
+    Comments &amp; Replies
+    (<span id="comment-count-{{ discussion.id }}">{{ comments|length }}</span>)
+</h2>
             <!--
                 Each comment contains:
 

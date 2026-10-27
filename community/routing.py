@@ -26,3 +26,18 @@ websocket_urlpatterns = [
     ),
 
 ]
+websocket_urlpatterns = [
+
+    # Existing WebSocket route for group chat.
+    re_path(
+        r"^ws/groups/(?P<group_id>\d+)/chat/$",
+        consumers.GroupChatConsumer.as_asgi(),
+    ),
+
+    # New WebSocket route for real-time discussion updates.
+    re_path(
+        r"^ws/groups/(?P<group_id>\d+)/discussions/$",
+        consumers.GroupDiscussionConsumer.as_asgi(),
+    ),
+
+]
