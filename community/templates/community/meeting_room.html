@@ -18,8 +18,9 @@
     >
 </head>
 
-<body>
-
+<body
+    data-chat-socket-url="/ws/groups/{{ group.id }}/chat/"
+>
     <!-- ========================================
          TOP NAVIGATION
     ========================================= -->
@@ -326,6 +327,43 @@
                                 </div>
 
                             </aside>
+                                            <!-- ====================================
+                     NEW MESSAGE NOTIFICATION
+                ===================================== -->
+
+                <div
+                    id="meeting-chat-notification"
+                    class="cv-chat-notification"
+                    role="status"
+                    hidden
+                >
+
+                    <!-- Developer who sent the message. -->
+                    <strong id="notification-sender"></strong>
+
+                    <!-- Preview of the new message. -->
+                    <p id="notification-message"></p>
+
+                    <!-- Notification actions. -->
+                    <div class="cv-chat-notification-actions">
+
+                        <button
+                            type="button"
+                            id="notification-reply"
+                        >
+                            Reply
+                        </button>
+
+                        <button
+                            type="button"
+                            id="notification-dismiss"
+                        >
+                            Dismiss
+                        </button>
+
+                    </div>
+
+                </div>
 
                             <!-- Source code viewer -->
                             <section class="development-editor">
@@ -400,103 +438,283 @@
                     aria-label="Team Chat"
                 >
 
-                    <!-- Chat header -->
-                    <div class="cv-chat-header">
 
-                        <div>
+    <!-- ============================================
+         CHAT HEADER
+    ============================================= -->
 
-                            <h2>💬 Team Chat</h2>
+    <div class="cv-chat-header">
 
-                            <p>Development group conversation</p>
+        <h3>Group Chat</h3>
+
+        <button
+            type="button"
+            id="close-chat"
+            aria-label="Close chat"
+        >
+            &times;
+        </button>
+
+    </div>
+
+
+    <!-- ============================================
+         GROUP CHAT MESSAGE HISTORY
+    ============================================= -->
+
+    <div
+        class="cv-chat-messages"
+        id="chat-messages"
+        aria-live="polite"
+    >
+
+        {% if chat_messages %}
+
+            <!-- Display existing messages from PostgreSQL. -->
+            {% for chat_message in chat_messages %}
+
+                <article
+                    class="cv-chat-message"
+                    id="message-{{ chat_message.id }}"
+                    data-message-id="{{ chat_message.id }}"
+                    data-edit-url="{% url 'edit_group_message' group.id chat_message.id %}"
+                    data-delete-url="{% url 'delete_group_message' group.id chat_message.id %}"
+                >
+
+                    <!-- ====================================
+                         MESSAGE HEADER
+                    ===================================== -->
+
+                    <div class="cv-chat-message-header">
+
+                        <!-- Message sender. -->
+                        <strong class="cv-chat-message-author">
+
+                            {% if chat_message.sender %}
+                                {{ chat_message.sender.username }}
+                            {% else %}
+                                Deleted user
+                            {% endif %}
+
+                        </strong>
+
+                        <!-- Message time. -->
+                        <small class="cv-chat-message-time">
+                            {{ chat_message.created_at|date:"H:i" }}
+                        </small>
+
+                    </div>
+
+
+                    <!-- ====================================
+                         REPLY INFORMATION
+                    ===================================== -->
+
+                    {% if chat_message.reply_to %}
+
+                        <div class="cv-chat-message-reply">
+
+                            Replying to
+
+                            {% if chat_message.reply_to.sender %}
+                                {{ chat_message.reply_to.sender.username }}
+                            {% else %}
+                                Deleted user
+                            {% endif %}
+
+                            {% if chat_message.reply_to.content %}
+
+                                <p>
+                                    {{ chat_message.reply_to.content|truncatechars:80 }}
+                                </p>
+
+                            {% endif %}
 
                         </div>
 
-                        <!-- Close chat without deleting messages -->
-                        <button
-                            type="button"
-                            id="close-chat"
-                            class="cv-close-chat"
-                            aria-label="Close Team Chat"
-                        >
-                            ✕
-                        </button>
+                    {% endif %}
 
-                    </div>
 
-                    <!-- Message display area -->
-                    <div
-                        class="cv-chat-messages"
-                        id="chat-messages"
-                        aria-live="polite"
-                    >
+                    <!-- ====================================
+                         MESSAGE CONTENT
+                    ===================================== -->
 
-                        <!-- Placeholder until messaging backend exists -->
-                        <div class="cv-chat-empty">
+                    <!-- Text and code messages. -->
+                    {% if chat_message.message_type == "text" or chat_message.message_type == "code" %}
 
-                            <h3>Team conversation</h3>
-
-                            <p>
-                                Messages from your group will appear here
-                                when real-time chat is connected.
-                            </p>
-
-                        </div>
-
-                    </div>
-
-                    <!-- Reply preview -->
-                    <div
-                        class="cv-chat-reply-preview"
-                        id="chat-reply-preview"
-                        hidden
-                    >
-
-                        <p id="chat-reply-description"></p>
-
-                        <button
-                            type="button"
-                            id="cancel-chat-reply"
-                        >
-                            Cancel Reply
-                        </button>
-
-                    </div>
-
-                    <!-- Message composer -->
-                    <div class="cv-chat-composer">
-
-                        <label for="chat-message-input">
-                            Message
-                        </label>
-
-                        <textarea
-                            id="chat-message-input"
-                            placeholder="Chat will be available soon..."
-                            rows="3"
-                            disabled
-                        ></textarea>
-
-                        <!-- Disabled until backend is implemented -->
-                        <button
-                            type="button"
-                            class="cv-send-message"
-                            id="send-chat-message"
-                            disabled
-                        >
-                            Send Message
-                        </button>
-
-                        <p class="cv-chat-help">
-                            Real-time messaging will be enabled in a later step.
+                        <p class="cv-chat-message-content">
+                            {{ chat_message.content|linebreaksbr }}
                         </p>
 
+                    {% endif %}
+
+                    <!-- Voice messages. -->
+                    {% if chat_message.message_type == "voice" and chat_message.attachment %}
+
+                        <audio controls>
+                            <source src="{{ chat_message.attachment.url }}">
+                        </audio>
+
+                    {% endif %}
+
+                    <!-- File attachments. -->
+                    {% if chat_message.message_type == "file" and chat_message.attachment %}
+
+                        <a
+                            href="{{ chat_message.attachment.url }}"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                        >
+                            View attachment
+                        </a>
+
+                    {% endif %}
+
+
+                    <!-- ====================================
+                         MESSAGE ACTION BUTTONS
+                    ===================================== -->
+
+                    <div class="cv-chat-message-actions">
+
+                        <!-- Group members can reply. -->
+                        <button
+                            type="button"
+                            class="cv-chat-reply-button"
+                            data-message-id="{{ chat_message.id }}"
+                            data-author="{% if chat_message.sender %}{{ chat_message.sender.username }}{% else %}Deleted user{% endif %}"
+                        >
+                            Reply
+                        </button>
+
+                        <!-- Only the message sender can edit or delete. -->
+                        {% if chat_message.sender_id == request.user.id %}
+
+                            <!-- Edit text messages only. -->
+                            {% if chat_message.message_type == "text" %}
+
+                                <button
+                                    type="button"
+                                    class="cv-chat-edit-button"
+                                    data-message-id="{{ chat_message.id }}"
+                                >
+                                    Edit
+                                </button>
+
+                            {% endif %}
+
+                            <!-- Delete own message. -->
+                            <button
+                                type="button"
+                                class="cv-chat-delete-button"
+                                data-message-id="{{ chat_message.id }}"
+                            >
+                                Delete
+                            </button>
+
+                        {% endif %}
+
                     </div>
 
-                </aside>
+                </article>
 
+            {% endfor %}
+
+        {% else %}
+
+            <!-- Show when no messages exist. -->
+            <div class="cv-chat-empty">
+                No messages yet. Start the conversation!
             </div>
 
-        </div>
+        {% endif %}
+
+    </div>
+
+
+    <!-- ============================================
+         REPLY PREVIEW
+    ============================================= -->
+
+    <div
+        id="chat-reply-preview"
+        class="cv-chat-reply-preview"
+        hidden
+    >
+
+        <span id="chat-reply-description"></span>
+
+        <button
+            type="button"
+            id="cancel-chat-reply"
+        >
+            Cancel
+        </button>
+
+    </div>
+
+
+    <!-- ============================================
+         MESSAGE COMPOSER — BELOW MESSAGES
+    ============================================= -->
+
+    <div class="cv-chat-composer">
+
+        <form
+            id="meeting-chat-form"
+            action="{% url 'send_group_message' group.id %}"
+            method="post"
+        >
+
+            {% csrf_token %}
+
+            <!-- Message type. -->
+            <input
+                type="hidden"
+                name="message_type"
+                value="text"
+            >
+
+            <!-- Store the message being replied to. -->
+            <input
+                type="hidden"
+                name="reply_to_id"
+                id="meeting-chat-reply-id"
+                value=""
+            >
+
+            <!-- Message input. -->
+            <label for="chat-message-input">
+                Message
+            </label>
+
+            <textarea
+                id="chat-message-input"
+                name="content"
+                placeholder="Type a message..."
+                rows="3"
+                required
+            ></textarea>
+
+            <!-- Send button. -->
+            <button
+                type="submit"
+                class="cv-send-message"
+                id="send-chat-message"
+            >
+                Send Message
+            </button>
+
+        </form>
+
+        <p class="cv-chat-help">
+            Messages are shared with your group's chat.
+        </p>
+
+    </div>
+
+</aside>
+
 
     </main>
 

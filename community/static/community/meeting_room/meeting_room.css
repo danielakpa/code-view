@@ -991,3 +991,186 @@
         flex: 1;
     }
 }
+/* ============================================================
+   MEETING ROOM — CHAT NOTIFICATION POPUP
+============================================================ */
+
+.cv-chat-notification {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    width: min(320px, calc(100vw - 48px));
+    padding: 16px;
+    background: #1e293b;
+    color: #ffffff;
+    border: 1px solid #475569;
+    border-radius: 12px;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+    z-index: 1000;
+}
+
+.cv-chat-notification[hidden] {
+    display: none;
+}
+
+.cv-chat-notification strong {
+    display: block;
+    margin-bottom: 8px;
+}
+
+.cv-chat-notification p {
+    margin: 0 0 14px;
+    overflow-wrap: anywhere;
+}
+
+.cv-chat-notification-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+.cv-chat-notification-actions button {
+    padding: 8px 12px;
+    border: 1px solid #64748b;
+    border-radius: 6px;
+    background: #334155;
+    color: white;
+    cursor: pointer;
+}
+
+.cv-chat-notification-actions button:hover {
+    background: #475569;
+}
+
+/* ============================================
+   KEEP CHAT INPUT BELOW MESSAGES
+============================================ */
+
+#team-chat-panel {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+#team-chat-panel .cv-chat-messages {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+}
+
+#team-chat-panel .cv-chat-composer {
+    flex: 0 0 auto;
+}
+
+#team-chat-panel .cv-chat-reply-preview {
+    flex: 0 0 auto;
+}
+/* ============================================================
+   MEETING ROOM CHAT LAYOUT
+============================================================ */
+
+/* Arrange the chat vertically. */
+#team-chat-panel {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+/* Messages occupy the available space and can scroll. */
+#chat-messages {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+}
+
+/* Keep the reply preview above the textarea. */
+#chat-reply-preview {
+    flex: 0 0 auto;
+}
+
+/* Hide the reply preview when no reply is selected. */
+#chat-reply-preview[hidden] {
+    display: none;
+}
+
+/* Keep the textarea and Send button below messages. */
+.cv-chat-composer {
+    flex: 0 0 auto;
+}
+
+/* Arrange the message buttons. */
+.cv-chat-message-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+/* Style Reply, Edit, and Delete. */
+.cv-chat-message-actions button {
+    padding: 6px 10px;
+    background: #1e293b;
+    color: white;
+    border: 1px solid #475569;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+/* Make the textarea fit the chat panel. */
+#chat-message-input {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+    margin: 8px 0;
+}
+/* ============================================
+   MEETING ROOM — INLINE MESSAGE EDITOR
+============================================ */
+
+.cv-chat-inline-editor {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 8px;
+}
+
+.cv-chat-edit-textarea {
+    width: 100%;
+    min-height: 75px;
+    padding: 10px;
+    border: 1px solid #64748b;
+    border-radius: 8px;
+    background: #0f172a;
+    color: #ffffff;
+    font: inherit;
+    resize: vertical;
+    box-sizing: border-box;
+}
+
+.cv-chat-edit-controls {
+    display: flex;
+    gap: 8px;
+}
+
+.cv-chat-save-button,
+.cv-chat-cancel-edit-button {
+    padding: 7px 14px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font: inherit;
+}
+
+.cv-chat-save-button {
+    background: #2563eb;
+    color: white;
+}
+
+.cv-chat-cancel-edit-button {
+    background: #334155;
+    color: white;
+}
+
+.cv-chat-save-button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}

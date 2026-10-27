@@ -543,3 +543,781 @@ document.addEventListener("DOMContentLoaded", () => {
     updateChatVisibility();
 
 });
+
+// ============================================================
+// CODEVIEW — MEETING ROOM REAL-TIME CHAT
+// ============================================================
+
+// Connect the Meeting Room to the existing Group Chat WebSocket.
+document.addEventListener("DOMContentLoaded", () => {
+
+    // Get the WebSocket URL from the HTML body.
+    const socketPath = document.body.dataset.chatSocketUrl;
+
+    // Find the Meeting Room message container.
+    const chatMessages = document.getElementById("chat-messages");
+
+    // Stop if the required elements are missing.
+    if (!socketPath || !chatMessages) {
+        return;
+    }
+
+    // Use secure WebSockets when the website uses HTTPS.
+    const protocol = window.location.protocol === "https:"
+        ? "wss:"
+        : "ws:";
+
+    // Build the complete WebSocket URL.
+    const socketUrl = `${protocol}//${window.location.host}${socketPath}`;
+
+    // Connect to the existing GroupChatConsumer.
+    const chatSocket = new WebSocket(socketUrl);
+
+    // ========================================================
+    // FUNCTION 1 — RECEIVE NEW MESSAGES
+    // ========================================================
+
+    chatSocket.addEventListener("message", (event) => {
+
+        // Convert the received JSON into a JavaScript object.
+        let data;
+
+        try {
+            data = JSON.parse(event.data);
+        } catch (error) {
+            console.error("Invalid chat message received.");
+            return;
+        }
+
+        // For now, handle only newly created messages.
+        if (data.type !== "message_created") {
+            return;
+        }
+
+        // Avoid displaying the same message twice.
+        if (document.getElementById(`message-${data.message_id}`)) {
+            return;
+        }
+
+        // Remove the empty-chat placeholder.
+        const emptyMessage = chatMessages.querySelector(".cv-chat-empty");
+
+        if (emptyMessage) {
+            emptyMessage.remove();
+        }
+
+        // ====================================================
+        // CREATE THE MESSAGE ELEMENT
+        // ====================================================
+
+        // Create the main message container.
+        const article = document.createElement("article");
+
+        article.className = "cv-chat-message";
+        article.id = `message-${data.message_id}`;
+        article.dataset.messageId = data.message_id;
+
+        // Create the message header.
+        const header = document.createElement("div");
+
+        header.className = "cv-chat-message-header";
+
+        // Display the sender's username.
+        const author = document.createElement("strong");
+
+        author.className = "cv-chat-message-author";
+        author.textContent = data.sender || "Deleted user";
+
+        // Display the message time.
+        const time = document.createElement("small");
+
+        time.className = "cv-chat-message-time";
+
+        const createdAt = new Date(data.created_at);
+
+        time.textContent = Number.isNaN(createdAt.getTime())
+            ? ""
+            : createdAt.toLocaleTimeString([], {
+                hour: "2-digit",
+                minute: "2-digit",
+            });
+
+        // Add the sender and time to the header.
+        header.appendChild(author);
+        header.appendChild(time);
+
+        // Create the message content.
+        const content = document.createElement("p");
+
+        content.className = "cv-chat-message-content";
+
+        // Use textContent to display messages safely.
+        content.textContent = data.content || "";
+
+        // Create the reply button.
+        const replyButton = document.createElement("button");
+
+        replyButton.type = "button";
+        replyButton.className = "cv-chat-reply-button";
+        replyButton.dataset.messageId = data.message_id;
+        replyButton.dataset.author = data.sender || "Deleted user";
+        replyButton.textContent = "Reply";
+
+        // Add everything to the message container.
+        article.appendChild(header);
+
+        // Show the reply relationship when present.
+        if (data.reply_to_id) {
+
+            const replyInfo = document.createElement("div");
+
+            replyInfo.className = "cv-chat-message-reply";
+            replyInfo.textContent = "↳ Replying to a message";
+
+            article.appendChild(replyInfo);
+        }
+
+        // Display text, code, voice notes, or attachments.
+        if (data.message_type === "voice" && data.attachment_url) {
+
+            const audio = document.createElement("audio");
+
+            audio.controls = true;
+            audio.src = data.attachment_url;
+
+            article.appendChild(audio);
+
+        } else if (
+            data.message_type === "file" &&
+            data.attachment_url
+        ) {
+
+            const attachment = document.createElement("a");
+
+            attachment.href = data.attachment_url;
+            attachment.textContent = "View attachment";
+            attachment.target = "_blank";
+            attachment.rel = "noopener noreferrer";
+
+            article.appendChild(attachment);
+
+        } else {
+
+            article.appendChild(content);
+        }
+
+        article.appendChild(replyButton);
+
+        // Display the new message at the bottom.
+        chatMessages.appendChild(article);
+
+        // Scroll to the newest message.
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+
+    });
+
+    // ========================================================
+    // WEBSOCKET CONNECTION EVENTS
+    // ========================================================
+
+    chatSocket.addEventListener("open", () => {
+        console.log("Meeting Room chat connected.");
+    });
+
+    chatSocket.addEventListener("close", () => {
+        console.log("Meeting Room chat disconnected.");
+    });
+
+    chatSocket.addEventListener("error", () => {
+        console.error("Meeting Room chat connection error.");
+    });
+
+});
+// ============================================================
+// CODEVIEW — SEND MEETING ROOM CHAT MESSAGES
+// ============================================================
+
+document.addEventListener("DOMContentLoaded", () => {
+
+    // Find the Meeting Room message form.
+    const chatForm = document.getElementById("meeting-chat-form");
+
+    // Find the message input.
+    const messageInput = document.getElementById("chat-message-input");
+
+    // Find the Send Message button.
+    const sendButton = document.getElementById("send-chat-message");
+
+    // Stop if the required elements are missing.
+    if (!chatForm || !messageInput || !sendButton) {
+        return;
+    }
+
+    // Prevent duplicate submissions.
+    let sendingMessage = false;
+
+    // ========================================================
+    // SEND MESSAGE WITHOUT REFRESHING
+    // ========================================================
+
+    chatForm.addEventListener("submit", async (event) => {
+
+        // Stop the browser from refreshing the page.
+        event.preventDefault();
+
+        // Prevent sending the same message twice.
+        if (sendingMessage) {
+            return;
+        }
+
+        // Remove unnecessary spaces.
+        const message = messageInput.value.trim();
+
+        // Reject empty messages.
+        if (!message) {
+            alert("Please enter a message.");
+            return;
+        }
+
+        // Prepare the form data for Django.
+        const formData = new FormData(chatForm);
+
+        // Send the trimmed message.
+        formData.set("content", message);
+
+        // Mark the message as being sent.
+        sendingMessage = true;
+        sendButton.disabled = true;
+
+        try {
+
+            // Send the message to the existing Django view.
+            const response = await fetch(chatForm.action, {
+                method: "POST",
+                body: formData,
+                credentials: "same-origin",
+                headers: {
+                    "X-Requested-With": "XMLHttpRequest",
+                },
+            });
+
+            // Read Django's response.
+            const data = await response.json();
+
+            // Handle failed requests.
+            if (!response.ok || !data.success) {
+                throw new Error(
+                    data.error || "Unable to send message."
+                );
+            }
+
+            // Clear the input after successful submission.
+            messageInput.value = "";
+
+            // Clear the reply ID.
+            const replyInput = document.getElementById(
+                "meeting-chat-reply-id"
+            );
+
+            if (replyInput) {
+                replyInput.value = "";
+            }
+
+            // Hide the reply preview.
+            const replyPreview = document.getElementById(
+                "chat-reply-preview"
+            );
+
+            if (replyPreview) {
+                replyPreview.hidden = true;
+                delete replyPreview.dataset.replyToId;
+            }
+
+            // Return focus to the message input.
+            messageInput.focus();
+
+            // The existing WebSocket listener displays
+            // the saved message automatically.
+
+        } catch (error) {
+
+            // Display an error without deleting the message.
+            alert(error.message);
+
+        } finally {
+
+            // Allow the developer to send another message.
+            sendingMessage = false;
+            sendButton.disabled = false;
+
+        }
+
+    });
+
+});
+// ============================================================
+// CODEVIEW — MEETING ROOM MESSAGE REPLIES
+// ============================================================
+
+document.addEventListener("DOMContentLoaded", () => {
+
+    // Find the container holding chat messages.
+    const chatMessages = document.getElementById("chat-messages");
+
+    // Find the hidden input that stores the original message ID.
+    const replyInput = document.getElementById(
+        "meeting-chat-reply-id"
+    );
+
+    // Find the reply preview.
+    const replyPreview = document.getElementById(
+        "chat-reply-preview"
+    );
+
+    // Find the text showing who we are replying to.
+    const replyDescription = document.getElementById(
+        "chat-reply-description"
+    );
+
+    // Find the button for cancelling a reply.
+    const cancelReplyButton = document.getElementById(
+        "cancel-chat-reply"
+    );
+
+    // Find the message input.
+    const messageInput = document.getElementById(
+        "chat-message-input"
+    );
+
+    // Stop if any required element is missing.
+    if (
+        !chatMessages ||
+        !replyInput ||
+        !replyPreview ||
+        !replyDescription ||
+        !cancelReplyButton ||
+        !messageInput
+    ) {
+        return;
+    }
+
+    // ========================================================
+    // FUNCTION 1 — SELECT A MESSAGE TO REPLY TO
+    // ========================================================
+
+    function selectReply(messageId, author, content) {
+
+        // Store the original message ID for Django.
+        replyInput.value = messageId;
+
+        // Display the original sender and message.
+        replyDescription.textContent =
+            `Replying to ${author}: ${content}`;
+
+        // Show the reply preview.
+        replyPreview.hidden = false;
+
+        // Focus the message input.
+        messageInput.focus();
+    }
+
+    // ========================================================
+    // FUNCTION 2 — CANCEL A REPLY
+    // ========================================================
+
+    function cancelReply() {
+
+        // Remove the selected message ID.
+        replyInput.value = "";
+
+        // Hide the reply preview.
+        replyPreview.hidden = true;
+
+        // Remove the previous reply description.
+        replyDescription.textContent = "";
+
+        // Clear the stored reply information.
+        delete replyPreview.dataset.replyToId;
+    }
+
+    // ========================================================
+    // FUNCTION 3 — HANDLE REPLY BUTTON CLICKS
+    // ========================================================
+
+    chatMessages.addEventListener("click", (event) => {
+
+        // Find the Reply button that was clicked.
+        const replyButton = event.target.closest(
+            ".cv-chat-reply-button"
+        );
+
+        // Ignore clicks outside Reply buttons.
+        if (!replyButton) {
+            return;
+        }
+
+        // Get the original message ID.
+        const messageId = replyButton.dataset.messageId;
+
+        // Get the original sender's name.
+        const author = replyButton.dataset.author || "Developer";
+
+        // Find the message containing the Reply button.
+        const messageElement = replyButton.closest(
+            ".cv-chat-message"
+        );
+
+        // Get the original message's content.
+        const contentElement = messageElement?.querySelector(
+            ".cv-chat-message-content"
+        );
+
+        const content = contentElement
+            ? contentElement.textContent.trim()
+            : "Attachment";
+
+        // Prepare the reply.
+        selectReply(messageId, author, content);
+
+    });
+
+    // ========================================================
+    // FUNCTION 4 — HANDLE CANCEL REPLY
+    // ========================================================
+
+    cancelReplyButton.addEventListener("click", cancelReply);
+
+});
+
+// ============================================================
+// MEETING ROOM — EDIT CHAT MESSAGES (INLINE EDITING)
+// ============================================================
+
+document.addEventListener("DOMContentLoaded", () => {
+
+    // Get the container holding all chat messages.
+    const chatMessages = document.getElementById("chat-messages");
+
+    if (!chatMessages) {
+        return;
+    }
+
+    // Listen for clicks on Edit, Save, and Cancel.
+    chatMessages.addEventListener("click", async (event) => {
+
+        const editButton = event.target.closest(".cv-chat-edit-button");
+        const saveButton = event.target.closest(".cv-chat-save-button");
+        const cancelButton = event.target.closest(".cv-chat-cancel-edit-button");
+
+        // Ignore clicks unrelated to editing.
+        if (!editButton && !saveButton && !cancelButton) {
+            return;
+        }
+
+        // Find the message containing the clicked button.
+        const messageElement = event.target.closest(".cv-chat-message");
+
+        if (!messageElement) {
+            return;
+        }
+
+        // Find the message's content.
+        const contentElement = messageElement.querySelector(
+            ".cv-chat-message-content"
+        );
+
+        if (!contentElement) {
+            return;
+        }
+
+        // ====================================================
+        // FUNCTION 1 — START EDITING
+        // ====================================================
+
+        if (editButton) {
+
+            // Prevent opening multiple editors for one message.
+            if (messageElement.querySelector(".cv-chat-edit-textarea")) {
+                return;
+            }
+
+            // Remember the original message.
+            const originalContent = contentElement.textContent.trim();
+
+            // Create an editable textarea.
+            const textarea = document.createElement("textarea");
+
+            textarea.className = "cv-chat-edit-textarea";
+            textarea.value = originalContent;
+            textarea.rows = 3;
+
+            // Create Save button.
+            const save = document.createElement("button");
+
+            save.type = "button";
+            save.className = "cv-chat-save-button";
+            save.textContent = "Save";
+
+            // Create Cancel button.
+            const cancel = document.createElement("button");
+
+            cancel.type = "button";
+            cancel.className = "cv-chat-cancel-edit-button";
+            cancel.textContent = "Cancel";
+
+            // Create a container for the buttons.
+            const controls = document.createElement("div");
+
+            controls.className = "cv-chat-edit-controls";
+
+            controls.appendChild(save);
+            controls.appendChild(cancel);
+
+            // Create a container for the editor.
+            const editor = document.createElement("div");
+
+            editor.className = "cv-chat-inline-editor";
+
+            editor.appendChild(textarea);
+            editor.appendChild(controls);
+
+            // Hide the original content while editing.
+            contentElement.hidden = true;
+
+            // Insert the editor after the message content.
+            contentElement.after(editor);
+
+            // Hide the Edit button while editing.
+            editButton.hidden = true;
+
+            // Focus the textarea.
+            textarea.focus();
+
+            return;
+        }
+
+        // ====================================================
+        // FUNCTION 2 — CANCEL EDITING
+        // ====================================================
+
+        if (cancelButton) {
+
+            // Remove the inline editor.
+            messageElement.querySelector(
+                ".cv-chat-inline-editor"
+            )?.remove();
+
+            // Show the original message.
+            contentElement.hidden = false;
+
+            // Show the Edit button again.
+            const originalEditButton = messageElement.querySelector(
+                ".cv-chat-edit-button"
+            );
+
+            if (originalEditButton) {
+                originalEditButton.hidden = false;
+            }
+
+            return;
+        }
+
+        // ====================================================
+        // FUNCTION 3 — SAVE EDITED MESSAGE
+        // ====================================================
+
+        if (saveButton) {
+
+            // Find the textarea.
+            const textarea = messageElement.querySelector(
+                ".cv-chat-edit-textarea"
+            );
+
+            if (!textarea) {
+                return;
+            }
+
+            // Get the updated message.
+            const newContent = textarea.value.trim();
+
+            if (!newContent) {
+                alert("Message cannot be empty.");
+                return;
+            }
+
+            // Get the Django edit endpoint.
+            const editUrl = messageElement.dataset.editUrl;
+
+            if (!editUrl) {
+                alert("Edit URL is missing.");
+                return;
+            }
+
+            // Get the CSRF token.
+            const csrfToken = document.querySelector(
+                "#meeting-chat-form input[name='csrfmiddlewaretoken']"
+            )?.value;
+
+            if (!csrfToken) {
+                alert("CSRF token is missing.");
+                return;
+            }
+
+            // Prepare the message.
+            const formData = new FormData();
+
+            formData.append("content", newContent);
+
+            // Prevent multiple Save clicks.
+            saveButton.disabled = true;
+
+            try {
+
+                // Send the updated message to Django.
+                const response = await fetch(editUrl, {
+                    method: "POST",
+                    credentials: "same-origin",
+                    headers: {
+                        "X-CSRFToken": csrfToken,
+                        "X-Requested-With": "XMLHttpRequest",
+                    },
+                    body: formData,
+                });
+
+                // Read the server response.
+                const data = await response.json();
+
+                if (!response.ok || !data.success) {
+                    throw new Error(
+                        data.error || "Unable to edit message."
+                    );
+                }
+
+                // Update the visible message.
+                contentElement.textContent = data.content ?? newContent;
+
+                // Remove the editor.
+                messageElement.querySelector(
+                    ".cv-chat-inline-editor"
+                )?.remove();
+
+                // Show the updated message.
+                contentElement.hidden = false;
+
+                // Restore the Edit button.
+                const originalEditButton = messageElement.querySelector(
+                    ".cv-chat-edit-button"
+                );
+
+                if (originalEditButton) {
+                    originalEditButton.hidden = false;
+                }
+
+            } catch (error) {
+
+                alert(error.message);
+
+                // Allow the developer to try saving again.
+                saveButton.disabled = false;
+            }
+        }
+
+    });
+
+});
+// ============================================================
+// MEETING ROOM — DELETE CHAT MESSAGES
+// ============================================================
+
+document.addEventListener("DOMContentLoaded", () => {
+
+    // Find the chat message container.
+    const chatMessages = document.getElementById("chat-messages");
+
+    if (!chatMessages) {
+        return;
+    }
+
+    // Listen for clicks on Delete buttons.
+    chatMessages.addEventListener("click", async (event) => {
+
+        const deleteButton = event.target.closest(
+            ".cv-chat-delete-button"
+        );
+
+        if (!deleteButton) {
+            return;
+        }
+
+        // Find the message being deleted.
+        const messageElement = deleteButton.closest(".cv-chat-message");
+
+        if (!messageElement) {
+            return;
+        }
+
+        // Get the Django delete URL.
+        const deleteUrl = messageElement.dataset.deleteUrl;
+
+        if (!deleteUrl) {
+            alert("Delete URL is missing.");
+            return;
+        }
+
+        // Ask for confirmation before deleting.
+        const confirmed = confirm(
+            "Are you sure you want to delete this message?"
+        );
+
+        if (!confirmed) {
+            return;
+        }
+
+        // Get Django's CSRF token.
+        const csrfToken = document.querySelector(
+            "#meeting-chat-form input[name='csrfmiddlewaretoken']"
+        )?.value;
+
+        if (!csrfToken) {
+            alert("CSRF token is missing.");
+            return;
+        }
+
+        // Prevent multiple delete requests.
+        deleteButton.disabled = true;
+
+        try {
+
+            // Send the delete request to Django.
+            const response = await fetch(deleteUrl, {
+                method: "POST",
+                credentials: "same-origin",
+                headers: {
+                    "X-CSRFToken": csrfToken,
+                    "X-Requested-With": "XMLHttpRequest",
+                },
+            });
+
+            // Read Django's response.
+            const data = await response.json();
+
+            if (!response.ok || !data.success) {
+                throw new Error(
+                    data.error || "Unable to delete message."
+                );
+            }
+
+            // Remove the deleted message from the chat.
+            messageElement.remove();
+
+        } catch (error) {
+
+            alert(error.message);
+
+            // Allow another attempt if deletion fails.
+            deleteButton.disabled = false;
+        }
+
+    });
+
+});

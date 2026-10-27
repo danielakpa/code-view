@@ -1170,8 +1170,25 @@ def meeting_room(request, group_id):
             role="admin",
         ).exists()
     )
+        # ============================================================
+    # LOAD EXISTING GROUP CHAT MESSAGES
+    # ============================================================
 
-    # Send all the information to the Development Room template.
+    # Get the latest 50 messages belonging to this group.
+    recent_messages = list(
+        GroupChatMessage.objects
+        .filter(group=group)
+        .select_related("sender", "reply_to", "reply_to__sender")
+        .order_by("-created_at", "-id")[:50]
+    )
+
+    # Display messages from oldest to newest.
+    recent_messages.reverse()
+    # ============================================================
+    # RENDER THE MEETING ROOM
+    # ============================================================
+
+    # Send the group, repository, and chat messages to the template.
     return render(
         request,
         "community/meeting_room.html",
@@ -1180,9 +1197,11 @@ def meeting_room(request, group_id):
             "repository": repository,
             "repository_form": repository_form,
             "can_manage_repository": can_manage_repository,
+
+            # Share the same messages used by Group Chat.
+            "chat_messages": recent_messages,
         },
     )
-
 
 # ============================================================
 # 9. PRIVATE GROUP CODE BOARD
@@ -2134,7 +2153,7 @@ def edit_group_message(request, group_id, message_id):
 
 # ============================================================
 # 18. DELETE GROUP CHAT MESSAGE
-#@login_required
+@login_required
 @require_POST
 def delete_group_message(request, group_id, message_id):
     """Permanently delete a message and broadcast the deletion."""
