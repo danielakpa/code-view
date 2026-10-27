@@ -766,16 +766,86 @@ if (data.type !== "message_created") {
 // CREATE MESSAGE ACTION BUTTONS
 // ====================================================
 
-// Create the same action container used in the HTML.
+// Get the logged-in developer's ID from Django.
+const currentUserId = Number(
+    document.body.dataset.currentUserId
+);
+
+// Get the sender's ID from the WebSocket message.
+const senderId = Number(data.sender_id);
+
+// Create the action button container.
 const actions = document.createElement("div");
 
 actions.className = "cv-chat-message-actions";
 
-// Add the Reply button inside the action container.
+// Every group member can reply.
 actions.appendChild(replyButton);
 
-// Add the action container to the message.
+// ====================================================
+// CHECK MESSAGE OWNERSHIP
+// ====================================================
+
+// Only the sender can edit or delete their message.
+if (
+    Number.isInteger(currentUserId) &&
+    currentUserId > 0 &&
+    senderId === currentUserId
+) {
+
+    // Get Django's URL templates.
+    const editUrlTemplate = document.body.dataset.editUrlTemplate;
+    const deleteUrlTemplate = document.body.dataset.deleteUrlTemplate;
+
+    // Build URLs using the real message ID.
+    const editUrl = editUrlTemplate.replace(
+        /\/0\/$/,
+        `/${data.message_id}/`
+    );
+
+    const deleteUrl = deleteUrlTemplate.replace(
+        /\/0\/$/,
+        `/${data.message_id}/`
+    );
+
+    // Store the URLs on the message.
+    article.dataset.editUrl = editUrl;
+    article.dataset.deleteUrl = deleteUrl;
+
+    // ====================================================
+    // CREATE EDIT BUTTON
+    // ====================================================
+
+    // Only text messages can be edited.
+    if (data.message_type === "text") {
+
+        const editButton = document.createElement("button");
+
+        editButton.type = "button";
+        editButton.className = "cv-chat-edit-button";
+        editButton.dataset.messageId = data.message_id;
+        editButton.textContent = "Edit";
+
+        actions.appendChild(editButton);
+    }
+
+    // ====================================================
+    // CREATE DELETE BUTTON
+    // ====================================================
+
+    const deleteButton = document.createElement("button");
+
+    deleteButton.type = "button";
+    deleteButton.className = "cv-chat-delete-button";
+    deleteButton.dataset.messageId = data.message_id;
+    deleteButton.textContent = "Delete";
+
+    actions.appendChild(deleteButton);
+}
+
+// Add the action buttons to the message.
 article.appendChild(actions);
+
         // Display the new message at the bottom.
         chatMessages.appendChild(article);
 

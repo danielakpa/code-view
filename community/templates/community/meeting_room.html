@@ -20,6 +20,9 @@
 
 <body
     data-chat-socket-url="/ws/groups/{{ group.id }}/chat/"
+    data-current-user-id="{{ request.user.id }}"
+    data-edit-url-template="{% url 'edit_group_message' group.id 0 %}"
+    data-delete-url-template="{% url 'delete_group_message' group.id 0 %}"
 >
     <!-- ========================================
          TOP NAVIGATION
