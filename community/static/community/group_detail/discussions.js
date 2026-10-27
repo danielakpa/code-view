@@ -352,18 +352,52 @@ if (!response.ok || !data.success) {
     // ====================================================
     // 12. REAL-TIME DISCUSSION LIKE UPDATES
     // ====================================================
+// Get the WebSocket URL provided by Django.
+const discussionSocketUrl = document.body.dataset.discussionSocketUrl;
 
-    // Find the group ID from the discussion WebSocket URL.
-    const discussionSocketUrl = document.body.dataset.discussionSocketUrl;
+// Store the timer used for reconnecting.
+let reconnectTimer = null;
 
-    // Only connect on pages that provide a WebSocket URL.
-    if (discussionSocketUrl) {
+// Create a function responsible for connecting to Django Channels.
+function connectDiscussionSocket() {
 
-        // Open a WebSocket connection.
-        const socket = new WebSocket(discussionSocketUrl);
+    // Do nothing if the page has no WebSocket URL.
+    if (!discussionSocketUrl) {
+        return;
+    }
 
-        // Listen for updates from Django Channels.
-        socket.addEventListener("message", function(event) {
+    // Establish a new WebSocket connection.
+    const socket = new WebSocket(discussionSocketUrl);
+
+    // Run when the WebSocket successfully connects.
+    socket.addEventListener("open", function() {
+
+        console.log("CodeView WebSocket connected.");
+    });
+
+    // Run when the WebSocket connection closes.
+    socket.addEventListener("close", function() {
+
+        console.log("CodeView WebSocket disconnected.");
+
+        // Cancel any existing reconnection timer.
+        if (reconnectTimer !== null) {
+            clearTimeout(reconnectTimer);
+        }
+
+        // Wait three seconds before reconnecting.
+        reconnectTimer = setTimeout(function() {
+
+            reconnectTimer = null;
+
+            // Try connecting again.
+            connectDiscussionSocket();
+
+        }, 3000);
+    });
+
+    // Listen for updates from Django Channels.
+    socket.addEventListener("message", function(event) {
 
             // Convert the received JSON into a JavaScript object.
             const data = JSON.parse(event.data);
@@ -381,6 +415,17 @@ if (data.event === "discussion_comment") {
     // UPDATE THE DISCUSSION COMMENT COUNT
     // ====================================================
 
+// Get the discussion ID stored in the current page.
+const currentDiscussionId = document.body.dataset.discussionId;
+
+// Only filter comments when viewing a specific discussion.
+if (
+    currentDiscussionId &&
+    Number(currentDiscussionId) !== Number(data.discussion_id)
+) {
+    // Ignore comments belonging to another discussion.
+    return;
+}
     
     // Find the comment count for this discussion.
     const commentCountElement = document.getElementById(
@@ -588,8 +633,11 @@ if (firstComment) {
             if (countElement) {
                 countElement.textContent = data.like_count;
             }
-
         });
-    }
 
-});
+} // End connectDiscussionSocket().
+
+// Start the first WebSocket connection.
+connectDiscussionSocket();
+
+}); // End DOMContentLoaded.
