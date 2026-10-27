@@ -1174,3 +1174,38 @@
     opacity: 0.6;
     cursor: not-allowed;
 }
+/* ============================================
+   INLINE DELETE CONFIRMATION
+============================================ */
+
+.cv-chat-delete-confirmation {
+    margin-top: 10px;
+    padding: 12px;
+    background: #1e293b;
+    border: 1px solid #475569;
+    border-radius: 8px;
+}
+
+.cv-chat-delete-confirmation p {
+    margin-bottom: 12px;
+    color: #f8fafc;
+}
+
+.cv-chat-delete-cancel,
+.cv-chat-delete-confirm {
+    padding: 8px 12px;
+    margin-right: 8px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.cv-chat-delete-cancel {
+    background: #475569;
+    color: white;
+}
+
+.cv-chat-delete-confirm {
+    background: #dc2626;
+    color: white;
+}

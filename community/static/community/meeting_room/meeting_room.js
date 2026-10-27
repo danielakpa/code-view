@@ -589,10 +589,66 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
 
-        // For now, handle only newly created messages.
-        if (data.type !== "message_created") {
-            return;
-        }
+// ====================================================
+// HANDLE EDITED MESSAGES
+// ====================================================
+
+// Developer A edits a message.
+// Django broadcasts the update to all connected members.
+if (data.type === "message_edited") {
+
+    // Find the existing message.
+    const messageElement = document.getElementById(
+        `message-${data.message_id}`
+    );
+
+    // Stop if the message isn't displayed.
+    if (!messageElement) {
+        return;
+    }
+
+    // Find its content.
+    const contentElement = messageElement.querySelector(
+        ".cv-chat-message-content"
+    );
+
+    // Update the content without refreshing the page.
+    if (contentElement) {
+        contentElement.textContent = data.content ?? "";
+    }
+
+    return;
+}
+
+// ====================================================
+// HANDLE DELETED MESSAGES
+// ====================================================
+
+// Developer A deletes a message.
+// Django broadcasts the deletion to all connected members.
+if (data.type === "message_deleted") {
+
+    // Find and remove the deleted message.
+    const messageElement = document.getElementById(
+        `message-${data.message_id}`
+    );
+
+    if (messageElement) {
+        messageElement.remove();
+    }
+
+    return;
+}
+
+// ====================================================
+// HANDLE NEW MESSAGES
+// ====================================================
+
+// Continue to the existing message-creation code only
+// when the event represents a newly created message.
+if (data.type !== "message_created") {
+    return;
+}
 
         // Avoid displaying the same message twice.
         if (document.getElementById(`message-${data.message_id}`)) {
@@ -706,8 +762,20 @@ document.addEventListener("DOMContentLoaded", () => {
             article.appendChild(content);
         }
 
-        article.appendChild(replyButton);
+// ====================================================
+// CREATE MESSAGE ACTION BUTTONS
+// ====================================================
 
+// Create the same action container used in the HTML.
+const actions = document.createElement("div");
+
+actions.className = "cv-chat-message-actions";
+
+// Add the Reply button inside the action container.
+actions.appendChild(replyButton);
+
+// Add the action container to the message.
+article.appendChild(actions);
         // Display the new message at the bottom.
         chatMessages.appendChild(article);
 
@@ -1231,91 +1299,158 @@ document.addEventListener("DOMContentLoaded", () => {
 
 document.addEventListener("DOMContentLoaded", () => {
 
-    // Find the chat message container.
+    // Get the container holding all chat messages.
     const chatMessages = document.getElementById("chat-messages");
 
     if (!chatMessages) {
         return;
     }
 
-    // Listen for clicks on Delete buttons.
+    // Listen for Delete, Cancel, and Confirm button clicks.
     chatMessages.addEventListener("click", async (event) => {
 
-        const deleteButton = event.target.closest(
-            ".cv-chat-delete-button"
-        );
+        // Find the button that was clicked.
+        const deleteButton = event.target.closest(".cv-chat-delete-button");
+        const cancelButton = event.target.closest(".cv-chat-delete-cancel");
+        const confirmButton = event.target.closest(".cv-chat-delete-confirm");
 
-        if (!deleteButton) {
+        // Ignore clicks unrelated to deletion.
+        if (!deleteButton && !cancelButton && !confirmButton) {
             return;
         }
 
-        // Find the message being deleted.
-        const messageElement = deleteButton.closest(".cv-chat-message");
+        // Find the message containing the clicked button.
+        const messageElement = event.target.closest(".cv-chat-message");
 
         if (!messageElement) {
             return;
         }
 
-        // Get the Django delete URL.
-        const deleteUrl = messageElement.dataset.deleteUrl;
+        // ====================================================
+        // FUNCTION 1 — CANCEL DELETION
+        // ====================================================
 
-        if (!deleteUrl) {
-            alert("Delete URL is missing.");
+        if (cancelButton) {
+
+            // Remove the confirmation box.
+            messageElement.querySelector(
+                ".cv-chat-delete-confirmation"
+            )?.remove();
+
+            // Stop here. Do not delete anything.
             return;
         }
 
-        // Ask for confirmation before deleting.
-        const confirmed = confirm(
-            "Are you sure you want to delete this message?"
-        );
+        // ====================================================
+        // FUNCTION 2 — SHOW DELETE CONFIRMATION
+        // ====================================================
 
-        if (!confirmed) {
-            return;
-        }
+        if (deleteButton) {
 
-        // Get Django's CSRF token.
-        const csrfToken = document.querySelector(
-            "#meeting-chat-form input[name='csrfmiddlewaretoken']"
-        )?.value;
-
-        if (!csrfToken) {
-            alert("CSRF token is missing.");
-            return;
-        }
-
-        // Prevent multiple delete requests.
-        deleteButton.disabled = true;
-
-        try {
-
-            // Send the delete request to Django.
-            const response = await fetch(deleteUrl, {
-                method: "POST",
-                credentials: "same-origin",
-                headers: {
-                    "X-CSRFToken": csrfToken,
-                    "X-Requested-With": "XMLHttpRequest",
-                },
-            });
-
-            // Read Django's response.
-            const data = await response.json();
-
-            if (!response.ok || !data.success) {
-                throw new Error(
-                    data.error || "Unable to delete message."
-                );
+            // Prevent multiple confirmation boxes.
+            if (messageElement.querySelector(".cv-chat-delete-confirmation")) {
+                return;
             }
 
-            // Remove the deleted message from the chat.
-            messageElement.remove();
+            // Create the confirmation box.
+            const confirmation = document.createElement("div");
 
-        } catch (error) {
+            confirmation.className = "cv-chat-delete-confirmation";
 
-            alert(error.message);
+            // Create the question.
+            const question = document.createElement("p");
 
-            // Allow another attempt if deletion fails.
-            deleteButton.disabled = false;
+            question.textContent = "Are you sure you want to delete this message?";
+
+            // Create the Cancel button.
+            const cancel = document.createElement("button");
+
+            cancel.type = "button";
+            cancel.className = "cv-chat-delete-cancel";
+            cancel.textContent = "Cancel";
+
+            // Create the Confirm button.
+            const confirm = document.createElement("button");
+
+            confirm.type = "button";
+            confirm.className = "cv-chat-delete-confirm";
+            confirm.textContent = "Yes, Delete";
+
+            // Add the elements to the confirmation box.
+            confirmation.appendChild(question);
+            confirmation.appendChild(cancel);
+            confirmation.appendChild(confirm);
+
+            // Display the confirmation inside the message.
+            messageElement.appendChild(confirmation);
+
+            // IMPORTANT:
+            // Stop here. Wait for the developer to click
+            // Cancel or Yes, Delete before continuing.
+            return;
+        }
+
+        // ====================================================
+        // FUNCTION 3 — CONFIRM AND DELETE MESSAGE
+        // ====================================================
+
+        if (confirmButton) {
+
+            // Get the Django delete URL.
+            const deleteUrl = messageElement.dataset.deleteUrl;
+
+            if (!deleteUrl) {
+                alert("Delete URL is missing.");
+                return;
+            }
+
+            // Get Django's CSRF token.
+            const csrfToken = document.querySelector(
+                "#meeting-chat-form input[name='csrfmiddlewaretoken']"
+            )?.value;
+
+            if (!csrfToken) {
+                alert("CSRF token is missing.");
+                return;
+            }
+
+            // Prevent duplicate requests.
+            confirmButton.disabled = true;
+            confirmButton.textContent = "Deleting...";
+
+            try {
+
+                // Send the delete request to Django.
+                const response = await fetch(deleteUrl, {
+                    method: "POST",
+                    credentials: "same-origin",
+                    headers: {
+                        "X-CSRFToken": csrfToken,
+                        "X-Requested-With": "XMLHttpRequest",
+                    },
+                });
+
+                // Read Django's response.
+                const data = await response.json();
+
+                // Check whether deletion succeeded.
+                if (!response.ok || !data.success) {
+                    throw new Error(
+                        data.error || "Unable to delete message."
+                    );
+                }
+
+                // Remove the deleted message from the chat.
+                messageElement.remove();
+
+            } catch (error) {
+
+                alert(error.message);
+
+                // Allow the developer to try again.
+                confirmButton.disabled = false;
+                confirmButton.textContent = "Yes, Delete";
+            }
         }
 
     });
