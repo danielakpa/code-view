@@ -1228,8 +1228,11 @@ def code_board(request, group_id):
             "You must belong to this group to access its code board."
         )
 
+    # Get the private Code Board belonging to the logged-in developer.
+    # Create a new board if this developer does not have one in this group.
     board, created = GroupCodeBoard.objects.get_or_create(
         group=group,
+        owner=request.user,
     )
 
     if request.method == "POST":

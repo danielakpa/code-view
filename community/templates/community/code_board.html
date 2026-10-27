@@ -25,6 +25,16 @@
 <!-- Code Board styles -->
 <link rel="stylesheet" href="{% static 'community/code_board/code_board.css' %}">
 
+    <!-- ========================================
+         XTERM.JS TERMINAL STYLES
+    ======================================== -->
+
+    <!-- Load the terminal's CSS. -->
+    <link
+        rel="stylesheet"
+        href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.css"
+    >
+
 </head>
 
 <body>
@@ -316,8 +326,44 @@
             </div>
 
         </form>
+                <!-- ========================================
+             6. PRIVATE DEVELOPER TERMINAL
+        ======================================== -->
+
+        <section class="code-board-terminal">
+
+            <!-- Terminal heading. -->
+            <div class="terminal-header">
+
+                <h2>
+                    Terminal
+                </h2>
+
+                <span class="terminal-status" id="terminal-status">
+                    Not connected
+                </span>
+
+            </div>
+
+            <!-- Terminal display area. -->
+            <div
+                id="terminal-container"
+                class="terminal-container"
+                aria-label="Private developer terminal"
+            ></div>
+
+        </section>
 
     </main>
+        <!-- ========================================
+         XTERM.JS TERMINAL LIBRARY
+    ======================================== -->
+
+    <!-- Load the terminal library. -->
+    <script src="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/lib/xterm.js"></script>
+
+    <!-- Load our CodeView terminal JavaScript. -->
+    <script src="{% static 'community/code_board/terminal.js' %}"></script>
 
 </body>
 

@@ -446,6 +446,16 @@ class HiddenDiscussion(models.Model):
 class GroupCodeBoard(models.Model):
     """Preserve the existing shared code board."""
 
+    # The developer who owns this private Code Board.
+    # Null is temporary so existing database records can be migrated.
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="private_code_boards",
+        null=True,
+        blank=True,
+    )
+
     LANGUAGE_CHOICES = [
         ("python", "Python"),
         ("javascript", "JavaScript"),
@@ -461,10 +471,12 @@ class GroupCodeBoard(models.Model):
         ("other", "Other"),
     ]
 
-    group = models.OneToOneField(
+    # Connect each private Code Board to a development group.
+    # One group can have multiple Code Boards.
+    group = models.ForeignKey(
         ProjectGroup,
         on_delete=models.CASCADE,
-        related_name="code_board",
+        related_name="code_boards",
     )
 
     title = models.CharField(
@@ -492,6 +504,14 @@ class GroupCodeBoard(models.Model):
     )
 
     updated_at = models.DateTimeField(auto_now=True)
+        # Ensure each developer has only one Code Board per group.
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["group", "owner"],
+                name="unique_group_developer_board",
+            )
+        ]
 
     def __str__(self):
         return f"{self.group.name} - Code Board"
