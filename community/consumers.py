@@ -9,6 +9,9 @@ Handles:
 5. Terminal session disconnection.
 """
 
+# Run asynchronous background tasks.
+import asyncio
+
 # Django Channels WebSocket consumer.
 from channels.generic.websocket import AsyncJsonWebsocketConsumer
 
@@ -188,7 +191,6 @@ class GroupDiscussionConsumer(AsyncJsonWebsocketConsumer):
 # ============================================================
 # 3. TERMINAL CONSUMER
 # ============================================================
-
 class TerminalConsumer(AsyncJsonWebsocketConsumer):
     """Handle private developer terminal WebSocket connections."""
 
@@ -203,6 +205,9 @@ class TerminalConsumer(AsyncJsonWebsocketConsumer):
 
         # Initially, no terminal session exists.
         self.terminal_session_id = None
+
+        # Initially, no heartbeat task is running.
+        self.heartbeat_task = None
 
         # Step 1: Reject developers who are not logged in.
         if not self.user.is_authenticated:
@@ -252,13 +257,18 @@ class TerminalConsumer(AsyncJsonWebsocketConsumer):
             await self.close(code=1013)
             return
 
-        # Save FastAPI's successful registration in PostgreSQL.
+        # Step 7: Save successful FastAPI registration in PostgreSQL.
         await self.mark_runner_registered()
 
-        # Step 7: Accept the WebSocket connection.
+        # Step 8: Accept the WebSocket connection.
         await self.accept()
 
-        # Step 8: Send session information to JavaScript.
+        # Step 9: Start sending heartbeats automatically.
+        self.heartbeat_task = asyncio.create_task(
+            self.heartbeat_loop()
+        )
+
+        # Step 10: Send session information to JavaScript.
         await self.send_json({
             "type": "terminal_connected",
             "message": "CodeView terminal session registered.",
@@ -297,6 +307,42 @@ class TerminalConsumer(AsyncJsonWebsocketConsumer):
             "status": session.status,
         }
 
+    async def heartbeat_loop(self):
+        """Send a heartbeat to FastAPI every 30 seconds."""
+
+        # Create a client for communicating with FastAPI.
+        runner = TerminalRunnerClient()
+
+        try:
+            # Keep sending heartbeats while the task is running.
+            while True:
+
+                # Wait 30 seconds without blocking other operations.
+                await asyncio.sleep(30)
+
+                try:
+                    # Notify FastAPI that this session is still connected.
+                    response = await runner.send_heartbeat(
+                        session_id=self.terminal_session_id,
+                    )
+
+                    # Display confirmation during development.
+                    print(
+                        "Terminal heartbeat successful:",
+                        response,
+                    )
+
+                except RunnerUnavailableError as error:
+                    # Log failures without exposing authentication tokens.
+                    print(
+                        "Terminal heartbeat failed:",
+                        error,
+                    )
+
+        except asyncio.CancelledError:
+            # Stop when the WebSocket disconnects.
+            raise
+
     async def receive_json(self, content, **kwargs):
         """Receive terminal messages without executing commands."""
 
@@ -312,25 +358,43 @@ class TerminalConsumer(AsyncJsonWebsocketConsumer):
     async def disconnect(self, close_code):
         """Handle terminal WebSocket disconnection."""
 
-        # No session means there is nothing to disconnect.
+        # Step 1: Stop the heartbeat task.
+        heartbeat_task = self.heartbeat_task
+
+        if heartbeat_task is not None:
+
+            # Request cancellation of the heartbeat.
+            heartbeat_task.cancel()
+
+            try:
+                # Wait until the heartbeat task stops.
+                await heartbeat_task
+
+            except asyncio.CancelledError:
+                # Cancellation is expected during disconnection.
+                pass
+
+        # Step 2: Check whether a terminal session exists.
         if self.terminal_session_id is None:
             return
 
         try:
-            # Notify the FastAPI Runner Service.
+            # Step 3: Notify FastAPI about the disconnection.
             runner = TerminalRunnerClient()
 
             await runner.disconnect_session(
                 session_id=self.terminal_session_id,
             )
 
-        except RunnerUnavailableError:
+        except RunnerUnavailableError as error:
             # FastAPI may be temporarily unavailable.
-            # We still need to update PostgreSQL.
-            pass
+            print(
+                "Terminal disconnection notification failed:",
+                error,
+            )
 
         finally:
-            # Always record the WebSocket disconnection.
+            # Step 4: Always update Django's PostgreSQL record.
             await self.mark_session_disconnected()
 
     @database_sync_to_async
@@ -362,32 +426,3 @@ class TerminalConsumer(AsyncJsonWebsocketConsumer):
             runner_status="registered",
             runner_registered_at=timezone.now(),
         )
-
-    async def disconnect_session(self, session_id):
-        """Notify FastAPI that a terminal session disconnected."""
-
-        # Authentication header.
-        headers = {
-            "Authorization": f"Bearer {self.token}"
-        }
-
-        try:
-            # Create an asynchronous HTTP client.
-            async with httpx.AsyncClient(timeout=10.0) as client:
-
-                # Notify FastAPI about the disconnection.
-                response = await client.post(
-                    f"{self.base_url}/internal/sessions/{session_id}/disconnect",
-                    headers=headers,
-                )
-
-                # Detect unsuccessful HTTP responses.
-                response.raise_for_status()
-
-                # Return FastAPI's response.
-                return response.json()
-
-        except httpx.HTTPError as error:
-            raise RunnerUnavailableError(
-                "Failed to notify runner about disconnection."
-            ) from error

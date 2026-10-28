@@ -222,3 +222,48 @@ def disconnect_runner_session(
             status_code=503,
             detail="Runner database operation failed.",
         )
+
+@app.post("/internal/sessions/{session_id}/heartbeat")
+def heartbeat_runner_session(
+    session_id: UUID,
+    authenticated: bool = Depends(verify_runner_token),
+    db: Session = Depends(get_db),
+):
+    """Update the last activity time of a registered session."""
+
+    # Find the terminal session in PostgreSQL.
+    session = db.get(RunnerSessionRecord, session_id)
+
+    # Reject unknown sessions.
+    if session is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Runner session not found.",
+        )
+
+    # Only registered sessions can send heartbeats.
+    if session.status != "registered":
+        raise HTTPException(
+            status_code=409,
+            detail="Runner session is not active.",
+        )
+
+    # Update the session's last activity time.
+    from datetime import datetime, timezone
+
+    session.updated_at = datetime.now(timezone.utc)
+
+    # Save the heartbeat in PostgreSQL.
+    try:
+        db.commit()
+    except SQLAlchemyError:
+        db.rollback()
+        raise HTTPException(
+            status_code=503,
+            detail="Failed to save session heartbeat.",
+        )
+
+    return {
+        "session_id": str(session.session_id),
+        "status": "active",
+    }

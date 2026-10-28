@@ -120,3 +120,33 @@ class TerminalRunnerClient:
             raise RunnerUnavailableError(
                 "Failed to notify FastAPI about terminal disconnection."
             ) from error
+
+    async def send_heartbeat(self, session_id):
+        """Send a terminal session heartbeat to FastAPI."""
+
+        # Include the authentication token.
+        headers = {
+            "Authorization": f"Bearer {self.token}"
+        }
+
+        try:
+            # Create an asynchronous HTTP client.
+            async with httpx.AsyncClient(timeout=10.0) as client:
+
+                # Send the heartbeat request to FastAPI.
+                response = await client.post(
+                    f"{self.base_url}/internal/sessions/{session_id}/heartbeat",
+                    headers=headers,
+                )
+
+                # Raise an error if FastAPI rejects the request.
+                response.raise_for_status()
+
+                # Return FastAPI's response.
+                return response.json()
+
+        except httpx.HTTPError as error:
+            # Handle network and HTTP errors.
+            raise RunnerUnavailableError(
+                "Failed to send terminal heartbeat."
+            ) from error
