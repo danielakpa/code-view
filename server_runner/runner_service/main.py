@@ -41,6 +41,7 @@ class CreateRunnerSessionRequest(BaseModel):
 
     # Private group containing the developer.
     group_id: int = Field(gt=0)
+    
 
 def verify_runner_token(
     authorization: str | None = Header(default=None),
@@ -115,4 +116,19 @@ async def create_runner_session(
         "developer_id": request.developer_id,
         "group_id": request.group_id,
         "status": "registered",
+    }
+
+@app.post("/internal/sessions/{session_id}/disconnect")
+async def disconnect_runner_session(
+    session_id: UUID,
+    authenticated: bool = Depends(verify_runner_token),
+):
+    """Acknowledge that a developer disconnected."""
+
+    # Authentication is required.
+    # Runner-side session state will be added in the next stage.
+
+    return {
+        "session_id": str(session_id),
+        "status": "disconnected",
     }

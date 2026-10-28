@@ -36,6 +36,18 @@ class DeveloperTerminalSession(models.Model):
         default="created",
     )
 
+        # Track the runner's session registration state.
+    runner_status = models.CharField(
+        max_length=20,
+        default="pending",
+    )
+
+    # Record when FastAPI last acknowledged the session.
+    runner_registered_at = models.DateTimeField(
+        null=True,
+        blank=True,
+    )
+
     # Time the session was created.
     created_at = models.DateTimeField(
         auto_now_add=True,
@@ -50,3 +62,4 @@ class DeveloperTerminalSession(models.Model):
         """Return a readable description of the session."""
 
         return f"{self.developer_id} - {self.session_id}"
+        
