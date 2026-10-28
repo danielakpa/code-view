@@ -1,60 +1,54 @@
-"""
-CodeView — Isolated Terminal Runner Client.
+"""Client for communicating with the CodeView Runner Service."""
 
-Responsibilities:
-1. Represent communication with the isolated runner.
-2. Keep runner configuration separate from Django consumers.
-3. Provide an interface for opening terminal sessions.
-4. Provide an interface for sending terminal input.
-5. Provide an interface for closing terminal sessions.
+# Read configuration from Django settings.
+from django.conf import settings
 
-IMPORTANT:
-This file does not execute Linux commands.
-The isolated runner service will be implemented separately.
-"""
+# HTTPX allows Python applications to make HTTP requests.
+import httpx
 
 
 class RunnerUnavailableError(Exception):
-    """Raised when the isolated terminal runner is unavailable."""
+    """Raised when the runner service cannot be reached or fails."""
 
 
 class TerminalRunnerClient:
-    """Communicate with CodeView's isolated terminal runner."""
+    """Handle communication between Django and the runner service."""
 
     def __init__(self):
-        """Initialize the terminal runner client."""
+        """Configure the runner service connection."""
 
-        # The runner service is not connected yet.
-        self.is_connected = False
+        # Read the runner service URL from Django settings.
+        self.base_url = settings.CODEVIEW_RUNNER_URL.rstrip("/")
 
-    async def open_session(self, session):
-        """Request a private terminal session from the runner."""
+        # Read the shared authentication token.
+        self.token = settings.CODEVIEW_RUNNER_TOKEN
 
-        # Do not pretend that a runner session exists.
-        raise RunnerUnavailableError(
-            "The isolated terminal runner is not configured yet."
-        )
+    async def get_status(self):
+        """Check the authenticated runner service status."""
 
-    async def send_input(self, session_id, data):
-        """Forward terminal keyboard input to the runner."""
+        # Include the secret token in the Authorization header.
+        headers = {
+            "Authorization": f"Bearer {self.token}",
+        }
 
-        # Commands must never execute on the Django host.
-        raise RunnerUnavailableError(
-            "Cannot send input: terminal runner is unavailable."
-        )
+        try:
+            # Create an asynchronous HTTP client.
+            async with httpx.AsyncClient(timeout=10.0) as client:
 
-    async def resize_terminal(self, session_id, columns, rows):
-        """Request a terminal size change."""
+                # Send an authenticated request to the runner.
+                response = await client.get(
+                    f"{self.base_url}/internal/status",
+                    headers=headers,
+                )
 
-        # Terminal resizing requires a running PTY.
-        raise RunnerUnavailableError(
-            "Cannot resize terminal: runner is unavailable."
-        )
+                # Raise an error if the request failed.
+                response.raise_for_status()
 
-    async def close_session(self, session_id):
-        """Request that the runner close a terminal session."""
+                # Return the JSON response as a Python dictionary.
+                return response.json()
 
-        # Runner cleanup will be implemented with the runner service.
-        raise RunnerUnavailableError(
-            "Cannot close session: runner is unavailable."
-        )
+        except httpx.HTTPError as error:
+            # Convert network and HTTP errors into our own exception.
+            raise RunnerUnavailableError(
+                "CodeView Runner Service is unavailable."
+            ) from error

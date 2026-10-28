@@ -14,8 +14,15 @@ from pathlib import Path
 import os
 
 
-# Build paths inside the project like this: BASE_DIR / 'subdir'.
+# Load environment variables from the project's .env file.
+from dotenv import load_dotenv
+
+
+# Get the project's root directory.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Load the .env file automatically when Django starts.
+load_dotenv(BASE_DIR / ".env")
 
 
 # Quick-start development settings - unsuitable for production
@@ -167,3 +174,15 @@ MEDIA_URL = "/media/"
 
 # Folder where uploaded files are stored.
 MEDIA_ROOT = BASE_DIR / "media"
+
+# Internal URL of the CodeView Runner Service.
+CODEVIEW_RUNNER_URL = os.environ.get(
+    "CODEVIEW_RUNNER_URL",
+    "http://127.0.0.1:9000",
+)
+
+# Secret token shared between Django and the runner service.
+CODEVIEW_RUNNER_TOKEN = os.environ.get(
+    "CODEVIEW_RUNNER_TOKEN",
+    "",
+)

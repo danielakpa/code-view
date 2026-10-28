@@ -72,5 +72,11 @@ AI usage, video bandwidth, and code execution will incur operating costs.
 
 
 
+# Secret used for Django-to-runner authentication.
+CODEVIEW_RUNNER_TOKEN=PASTE_YOUR_GENERATED_TOKEN_HERE
+
+# Internal address of the runner service.
+CODEVIEW_RUNNER_URL=http://127.0.0.1:9000
+47C0yN5pqzydxX7MMRbJ6Yy02NTggZn8FPaTBCyFDCfqaWJ-MiUV87o4iffzlJfm
 
 sudo docker pull ghcr.io/danielakpa/codeview-developer:dev
