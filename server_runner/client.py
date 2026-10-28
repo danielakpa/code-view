@@ -90,3 +90,33 @@ class TerminalRunnerClient:
             raise RunnerUnavailableError(
                 "Failed to register terminal session with FastAPI."
             ) from error
+
+    async def disconnect_session(self, session_id):
+        """Notify FastAPI when a developer disconnects."""
+
+        # Send the authentication token to FastAPI.
+        headers = {
+            "Authorization": f"Bearer {self.token}"
+        }
+
+        try:
+            # Create an asynchronous HTTP client.
+            async with httpx.AsyncClient(timeout=10.0) as client:
+
+                # Send the session ID to FastAPI.
+                response = await client.post(
+                    f"{self.base_url}/internal/sessions/{session_id}/disconnect",
+                    headers=headers,
+                )
+
+                # Raise an error if FastAPI rejects the request.
+                response.raise_for_status()
+
+                # Return FastAPI's response.
+                return response.json()
+
+        except httpx.HTTPError as error:
+            # Handle connection failures and HTTP errors.
+            raise RunnerUnavailableError(
+                "Failed to notify FastAPI about terminal disconnection."
+            ) from error
