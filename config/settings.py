@@ -58,6 +58,8 @@ INSTALLED_APPS = [
     'home',
     'users',
     'community',
+    'server_runner',
+
 ]
 
 

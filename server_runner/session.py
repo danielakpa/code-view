@@ -1,56 +1,49 @@
-"""
-CodeView — Private Developer Terminal Sessions.
+"""Manage CodeView developer terminal sessions."""
 
-Responsibilities:
-1. Identify each developer's private terminal session.
-2. Keep terminal sessions separate between developers.
-3. Keep sessions separate between project groups.
-4. Represent the state of a terminal connection.
-
-NOTE:
-This file does not execute Linux commands.
-Command execution will happen inside an isolated runner.
-"""
-
+# Dataclass helps us create classes that store structured data.
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+
+# Generate unique session identifiers.
 from uuid import uuid4
+
+# Record when a session was created.
+from datetime import datetime, timezone
 
 
 @dataclass
 class TerminalSession:
-    """Represent one developer's private terminal session."""
+    """Represent a developer's terminal session."""
 
-    # The project group this terminal belongs to.
+    # ID of the group the developer belongs to.
     group_id: int
 
-    # The developer who owns this terminal.
+    # ID of the developer who owns this session.
     developer_id: int
 
-    # Unique identifier for this terminal session.
+    # Generate a unique identifier for each session.
     session_id: str = field(
         default_factory=lambda: str(uuid4())
     )
 
-    # Whether the terminal is connected to its runner.
-    is_connected: bool = False
-
-    # When this session object was created.
+    # Record when the session was created.
     created_at: datetime = field(
         default_factory=lambda: datetime.now(timezone.utc)
     )
 
-    def get_workspace_key(self):
-        """Return a unique workspace identifier for this developer and group."""
+    # Track the current session state.
+    status: str = "created"
 
-        return f"group_{self.group_id}_developer_{self.developer_id}"
+    def get_workspace_key(self):
+        """Return a unique workspace identifier."""
+
+        return f"group-{self.group_id}-developer-{self.developer_id}"
 
     def connect(self):
-        """Mark the terminal session as connected."""
+        """Mark the session as connected."""
 
-        self.is_connected = True
+        self.status = "connected"
 
     def disconnect(self):
-        """Mark the terminal session as disconnected."""
+        """Mark the session as disconnected."""
 
-        self.is_connected = False
+        self.status = "disconnected"

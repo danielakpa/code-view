@@ -153,72 +153,113 @@ class GroupDiscussionConsumer(AsyncJsonWebsocketConsumer):
             group_id=self.group_id,
             user=self.user,
         ).exists()
-
 class TerminalConsumer(AsyncJsonWebsocketConsumer):
-    """Handle private terminal WebSocket connections."""
+    """Handle private developer terminal WebSocket connections."""
 
     async def connect(self):
-        """Authenticate the developer before connecting."""
+        """Authenticate the developer and create a terminal session."""
 
-        # Get the logged-in developer.
+        # Get the currently logged-in developer.
         self.user = self.scope["user"]
 
-        # Get the group ID from the WebSocket URL.
+        # Get the requested group ID from the WebSocket URL.
         self.group_id = self.scope["url_route"]["kwargs"]["group_id"]
+
+        # Store the session ID for this WebSocket connection.
+        self.terminal_session_id = None
 
         # Reject developers who are not logged in.
         if not self.user.is_authenticated:
             await self.close(code=4401)
             return
 
-        # Verify that the developer belongs to a private group.
-        is_allowed = await self.check_terminal_access()
+        # Create a session only if the developer has permission.
+        session_data = await self.create_session()
 
-        # Reject unauthorized developers.
-        if not is_allowed:
+        # Reject developers who cannot access this group.
+        if session_data is None:
             await self.close(code=4403)
             return
 
-        # Accept the private WebSocket connection.
+        # Remember the session ID.
+        self.terminal_session_id = session_data["session_id"]
+
+        # Accept the WebSocket connection.
         await self.accept()
 
-        # Notify the browser that the connection is ready.
+        # Send the new session information to JavaScript.
         await self.send_json({
             "type": "terminal_connected",
-            "message": "CodeView terminal connection established.",
+            "message": "CodeView terminal session created.",
+            "session_id": self.terminal_session_id,
+            "status": session_data["status"],
         })
-
-    async def receive_json(self, content, **kwargs):
-        """Receive terminal messages without executing commands."""
-
-        # Terminal execution is not implemented yet.
-        await self.send_json({
-            "type": "terminal_info",
-            "message": "Secure terminal runner is not connected yet.",
-        })
-
-    async def disconnect(self, close_code):
-        """Handle terminal disconnection."""
-
-        # The runner will be cleaned up here in a later step.
-        pass
 
     @database_sync_to_async
-    def check_terminal_access(self):
-        """Check private-group membership in PostgreSQL."""
+    def create_session(self):
+        """Check group access and create a database session."""
 
-        # Import the existing membership helper.
-        from .views import is_group_member
+        # Import the session creation service.
+        from server_runner.services import create_terminal_session
 
-        # Find the requested private group.
+        # Find the requested private development group.
         group = ProjectGroup.objects.filter(
             id=self.group_id,
             is_private=True,
         ).first()
 
-        # Reject nonexistent or public groups.
+        # Reject groups that do not exist or are public.
         if group is None:
-            return False
+            return None
 
-        # Allow only developers belonging to this group.
-        return is_group_member(group, self.user)
+        try:
+            # Create a terminal session for the logged-in developer.
+            session = create_terminal_session(
+                user=self.user,
+                group=group,
+            )
+
+        except PermissionError:
+            # Reject unauthorized developers.
+            return None
+
+        # Return only the information needed by the WebSocket.
+        return {
+            "session_id": str(session.session_id),
+            "status": session.status,
+        }
+
+    async def receive_json(self, content, **kwargs):
+        """Receive terminal messages without executing commands."""
+
+        # Terminal command execution will be implemented later.
+        await self.send_json({
+            "type": "terminal_info",
+            "message": "Terminal session created. Sandbox execution is not connected yet.",
+        })
+
+    async def disconnect(self, close_code):
+        """Mark the terminal session as disconnected."""
+
+        # No session exists if authentication failed.
+        if self.terminal_session_id is None:
+            return
+
+        # Update the session record in PostgreSQL.
+        await self.mark_session_disconnected()
+
+    @database_sync_to_async
+    def mark_session_disconnected(self):
+        """Update the session status when the WebSocket closes."""
+
+        # Import the terminal session model.
+        from server_runner.models import DeveloperTerminalSession
+
+        # Update only the session belonging to this developer.
+        DeveloperTerminalSession.objects.filter(
+            session_id=self.terminal_session_id,
+            developer_id=self.user.pk,
+            group_id=self.group_id,
+        ).update(
+            status="disconnected",
+        )
