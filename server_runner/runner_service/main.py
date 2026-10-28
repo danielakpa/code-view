@@ -21,6 +21,18 @@ from pydantic import BaseModel, Field
 # Validate session identifiers.
 from uuid import UUID
 
+# Create database sessions for FastAPI requests.
+from sqlalchemy.orm import Session
+
+# Handle database errors.
+from sqlalchemy.exc import SQLAlchemyError
+
+# Access the runner's PostgreSQL connection.
+from server_runner.runner_service.database import get_db
+
+# Access the runner session database model.
+from server_runner.runner_service.models import RunnerSessionRecord
+
 
 # Create the runner service application.
 app = FastAPI(
@@ -100,35 +112,113 @@ def runner_status(
         "authenticated": authenticated,
         "status": "ready",
     }
-
 @app.post("/internal/sessions")
-async def create_runner_session(
+def create_runner_session(
     request: CreateRunnerSessionRequest,
     authenticated: bool = Depends(verify_runner_token),
+    db: Session = Depends(get_db),
 ):
-    """Accept a terminal session registration from Django."""
+    """Register a developer terminal session in PostgreSQL."""
 
-    # Authentication is enforced by verify_runner_token.
-    # No container or shell is started at this stage.
+    try:
+        # Check whether this session already exists.
+        existing_session = db.get(
+            RunnerSessionRecord,
+            request.session_id,
+        )
 
-    return {
-        "session_id": str(request.session_id),
-        "developer_id": request.developer_id,
-        "group_id": request.group_id,
-        "status": "registered",
-    }
+        if existing_session:
+            # Reject attempts to reuse an ID for another developer/group.
+            if (
+                existing_session.developer_id != request.developer_id
+                or existing_session.group_id != request.group_id
+            ):
+                raise HTTPException(
+                    status_code=409,
+                    detail="Session ID belongs to another developer or group.",
+                )
+
+            # Do not reactivate disconnected sessions accidentally.
+            return {
+                "session_id": str(existing_session.session_id),
+                "developer_id": existing_session.developer_id,
+                "group_id": existing_session.group_id,
+                "status": existing_session.status,
+            }
+
+        # Create a new runner session record.
+        session = RunnerSessionRecord(
+            session_id=request.session_id,
+            developer_id=request.developer_id,
+            group_id=request.group_id,
+            status="registered",
+        )
+
+        # Add the record to the database transaction.
+        db.add(session)
+
+        # Save the record permanently.
+        db.commit()
+
+        return {
+            "session_id": str(session.session_id),
+            "developer_id": session.developer_id,
+            "group_id": session.group_id,
+            "status": "registered",
+        }
+
+    except HTTPException:
+        raise
+
+    except SQLAlchemyError:
+        # Undo any unsuccessful database changes.
+        db.rollback()
+
+        raise HTTPException(
+            status_code=503,
+            detail="Runner database operation failed.",
+        )
 
 @app.post("/internal/sessions/{session_id}/disconnect")
-async def disconnect_runner_session(
+def disconnect_runner_session(
     session_id: UUID,
     authenticated: bool = Depends(verify_runner_token),
+    db: Session = Depends(get_db),
 ):
-    """Acknowledge that a developer disconnected."""
+    """Mark a runner session as disconnected."""
 
-    # Authentication is required.
-    # Runner-side session state will be added in the next stage.
+    try:
+        # Find the existing session.
+        session = db.get(
+            RunnerSessionRecord,
+            session_id,
+        )
 
-    return {
-        "session_id": str(session_id),
-        "status": "disconnected",
-    }
+        # Reject unknown session IDs.
+        if session is None:
+            raise HTTPException(
+                status_code=404,
+                detail="Runner session not found.",
+            )
+
+        # Update the runner session status.
+        session.status = "disconnected"
+
+        # Save the change in PostgreSQL.
+        db.commit()
+
+        return {
+            "session_id": str(session.session_id),
+            "status": "disconnected",
+        }
+
+    except HTTPException:
+        raise
+
+    except SQLAlchemyError:
+        db.rollback()
+
+        raise HTTPException(
+            status_code=503,
+            detail="Runner database operation failed.",
+        )

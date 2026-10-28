@@ -9,6 +9,11 @@ from django.conf import settings
 # Generate unique identifiers for terminal sessions.
 import uuid
 
+# SQLAlchemy database column types.
+from sqlalchemy import DateTime, ForeignKey, Integer, String
+from sqlalchemy.dialects.postgresql import UUID as PostgreSQLUUID
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+
 
 class DeveloperTerminalSession(models.Model):
     """Store a developer's terminal session information."""
@@ -62,4 +67,5 @@ class DeveloperTerminalSession(models.Model):
         """Return a readable description of the session."""
 
         return f"{self.developer_id} - {self.session_id}"
+        
         
