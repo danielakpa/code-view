@@ -4,7 +4,8 @@
 from datetime import datetime, timezone
 
 # Validate unique session IDs.
-from uuid import UUID
+from uuid import UUID, uuid4
+
 
 # Define structured data.
 from pydantic import BaseModel, Field
@@ -93,4 +94,51 @@ class RunnerSessionRecord(Base):
         nullable=False,
         default=lambda: datetime.now(timezone.utc),
         onupdate=lambda: datetime.now(timezone.utc),
+    )
+
+    class SandboxRecord(Base):
+    """Store persistent developer sandbox information."""
+
+    __tablename__ = "sandboxes"
+    __table_args__ = {"schema": "runner"}
+
+    # Unique identifier for each sandbox.
+    sandbox_id = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid4,
+    )
+
+    # Developer who owns the sandbox.
+    developer_id = mapped_column(
+        Integer,
+        nullable=False,
+    )
+
+    # CodeView group associated with the sandbox.
+    group_id = mapped_column(
+        Integer,
+        nullable=False,
+    )
+
+    # Current sandbox lifecycle status.
+    status = mapped_column(
+        String(20),
+        nullable=False,
+        default="prepared",
+    )
+
+    # Time the sandbox record was created.
+    created_at = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+    # Time the record was last updated.
+    updated_at = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+        nullable=False,
     )
