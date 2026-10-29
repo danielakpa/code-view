@@ -16,13 +16,13 @@ from server_runner.runner_service.models import RunnerSessionRecord
 def find_stale_sessions(minutes=30):
     """Find registered sessions that have not been updated recently."""
 
-    # Calculate the time before which sessions are considered stale.
+    # Calculate when a session becomes stale.
     cutoff = datetime.now(timezone.utc) - timedelta(minutes=minutes)
 
     # Open a PostgreSQL database session.
     with SessionLocal() as db:
 
-        # Find registered sessions older than the cutoff.
+        # Find sessions that have not been updated recently.
         statement = select(RunnerSessionRecord).where(
             RunnerSessionRecord.status == "registered",
             RunnerSessionRecord.updated_at < cutoff,
@@ -31,7 +31,7 @@ def find_stale_sessions(minutes=30):
         # Execute the query.
         sessions = db.scalars(statement).all()
 
-        # Return session information as dictionaries.
+        # Return session information.
         return [
             {
                 "session_id": str(session.session_id),

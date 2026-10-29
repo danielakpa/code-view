@@ -9,16 +9,19 @@ from uuid import UUID, uuid4
 # Define structured API data.
 from pydantic import BaseModel, Field
 
+from sqlalchemy import UniqueConstraint
+
 # SQLAlchemy database column types.
 from sqlalchemy import DateTime, Integer, String, Column
 from sqlalchemy.dialects.postgresql import UUID as PostgreSQLUUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
+
 class RunnerSession(BaseModel):
     """Represent a developer session managed by FastAPI."""
 
-    # Unique ID created by Django.
+    # Unique ID created by Django
     session_id: UUID
 
     # Developer who owns the session.
@@ -94,13 +97,21 @@ class RunnerSessionRecord(Base):
         onupdate=lambda: datetime.now(timezone.utc),
     )
 
-
 class SandboxRecord(Base):
     """Store persistent developer sandbox information."""
 
     # Store the sandbox table inside the runner schema.
     __tablename__ = "sandboxes"
-    __table_args__ = {"schema": "runner"}
+
+    # Prevent duplicate sandboxes for the same developer and group.
+    __table_args__ = (
+        UniqueConstraint(
+            "developer_id",
+            "group_id",
+            name="uq_sandbox_developer_group",
+        ),
+        {"schema": "runner"},
+    )
 
     # Unique sandbox identifier.
     sandbox_id: Mapped[UUID] = mapped_column(
@@ -142,9 +153,10 @@ class SandboxRecord(Base):
         default=lambda: datetime.now(timezone.utc),
         onupdate=lambda: datetime.now(timezone.utc),
     )
-    # Store the Docker container ID assigned to this sandbox.
-    # None means a Docker container has not been created yet.
-    container_id = Column(
+
+    # Docker container assigned to this sandbox.
+    # None means no container has been assigned yet.
+    container_id: Mapped[str | None] = mapped_column(
         String(64),
         nullable=True,
         unique=True,

@@ -3,6 +3,10 @@
 # Import the function that saves sandbox records.
 from server_runner.runner_service.sandbox.repository import save_sandbox
 
+from server_runner.runner_service.sandbox.repository import (
+    get_or_create_sandbox,
+)
+
 from dataclasses import dataclass, replace
 from pathlib import Path
 
@@ -125,3 +129,35 @@ class SandboxManager:
 
         # Step 3: Return both the workspace and database record.
         return sandbox, sandbox_record
+
+    def get_or_prepare_sandbox(
+        self,
+        db,
+        developer_id: int,
+        group_id: int,
+    ):
+        """Get an existing sandbox or prepare one for this developer and group."""
+
+        # Validate IDs before performing database operations.
+        if type(developer_id) is not int or developer_id <= 0:
+            raise ValueError("Invalid developer ID.")
+
+        if type(group_id) is not int or group_id <= 0:
+            raise ValueError("Invalid group ID.")
+
+        # Get an existing sandbox record or create a new one.
+        sandbox_record = get_or_create_sandbox(
+            db=db,
+            developer_id=developer_id,
+            group_id=group_id,
+        )
+
+        # Prepare the developer's private workspace.
+        # The existing workspace is reused if it already exists.
+        workspace_path = create_workspace(
+            developer_id=developer_id,
+            group_id=group_id,
+        )
+
+        # Return the sandbox's database record and workspace path.
+        return sandbox_record, workspace_path
