@@ -1,17 +1,16 @@
-"""Database models for persistent runner session records."""
+"""Database models for persistent runner and sandbox records."""
 
 # Generate timestamps.
 from datetime import datetime, timezone
 
-# Validate unique session IDs.
+# Generate and validate unique IDs.
 from uuid import UUID, uuid4
 
-
-# Define structured data.
+# Define structured API data.
 from pydantic import BaseModel, Field
 
 # SQLAlchemy database column types.
-from sqlalchemy import DateTime, ForeignKey, Integer, String
+from sqlalchemy import DateTime, Integer, String
 from sqlalchemy.dialects.postgresql import UUID as PostgreSQLUUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -42,9 +41,8 @@ class RunnerSession(BaseModel):
     )
 
 
-        # Base class for SQLAlchemy database models.
 class Base(DeclarativeBase):
-    """Base class used to define runner database tables."""
+    """Base class used to define SQLAlchemy database tables."""
 
     pass
 
@@ -52,7 +50,7 @@ class Base(DeclarativeBase):
 class RunnerSessionRecord(Base):
     """Store a runner-managed terminal session in PostgreSQL."""
 
-    # Store this table inside the runner schema.
+    # Store the table inside the runner schema.
     __tablename__ = "runner_sessions"
     __table_args__ = {"schema": "runner"}
 
@@ -96,49 +94,51 @@ class RunnerSessionRecord(Base):
         onupdate=lambda: datetime.now(timezone.utc),
     )
 
-    class SandboxRecord(Base):
+
+class SandboxRecord(Base):
     """Store persistent developer sandbox information."""
 
+    # Store the sandbox table inside the runner schema.
     __tablename__ = "sandboxes"
     __table_args__ = {"schema": "runner"}
 
-    # Unique identifier for each sandbox.
-    sandbox_id = mapped_column(
-        UUID(as_uuid=True),
+    # Unique sandbox identifier.
+    sandbox_id: Mapped[UUID] = mapped_column(
+        PostgreSQLUUID(as_uuid=True),
         primary_key=True,
         default=uuid4,
     )
 
     # Developer who owns the sandbox.
-    developer_id = mapped_column(
+    developer_id: Mapped[int] = mapped_column(
         Integer,
         nullable=False,
     )
 
     # CodeView group associated with the sandbox.
-    group_id = mapped_column(
+    group_id: Mapped[int] = mapped_column(
         Integer,
         nullable=False,
     )
 
     # Current sandbox lifecycle status.
-    status = mapped_column(
+    status: Mapped[str] = mapped_column(
         String(20),
         nullable=False,
         default="prepared",
     )
 
     # Time the sandbox record was created.
-    created_at = mapped_column(
+    created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
-        default=lambda: datetime.now(timezone.utc),
         nullable=False,
+        default=lambda: datetime.now(timezone.utc),
     )
 
-    # Time the record was last updated.
-    updated_at = mapped_column(
+    # Time the sandbox record was last updated.
+    updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
+        nullable=False,
         default=lambda: datetime.now(timezone.utc),
         onupdate=lambda: datetime.now(timezone.utc),
-        nullable=False,
     )
