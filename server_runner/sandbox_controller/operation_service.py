@@ -1,4 +1,4 @@
-"""Validate CodeView sandbox operation requests."""
+"""Validate and claim CodeView sandbox operation requests."""
 
 from server_runner.sandbox_controller.authorization import (
     SandboxIdentity,
@@ -15,12 +15,13 @@ from server_runner.sandbox_controller.replay import (
 
 
 class SandboxOperationService:
-    """Coordinate sandbox authorization and replay checks."""
+    """Coordinate sandbox authorization and replay protection."""
 
     def __init__(self, replay_store=None):
         """Initialize the operation service."""
 
-        # Use a supplied replay store or create a development store.
+        # Use the provided replay store.
+        # Default is for development and tests only.
         self.replay_store = (
             replay_store
             if replay_store is not None
@@ -35,20 +36,20 @@ class SandboxOperationService:
         """
         Validate an operation and claim its request ID.
 
-        trusted_identity must come from verified server-side data.
+        trusted_identity must come from verified server-side records.
         """
 
-        # Require the expected request type.
+        # Require the correct request type.
         if not isinstance(request, SandboxOperationRequest):
             raise ValueError("Invalid operation request.")
 
-        # Check that the requested sandbox matches the trusted sandbox.
+        # Ensure the operation targets the correct sandbox.
         if request.sandbox_id != trusted_identity.sandbox_id:
             raise PermissionError(
                 "Operation targets a different sandbox."
             )
 
-        # Check developer, group, and operation permissions.
+        # Verify developer, group, and operation permissions.
         authorize_sandbox_operation(
             sandbox=trusted_identity,
             developer_id=request.developer_id,
@@ -56,7 +57,7 @@ class SandboxOperationService:
             operation=request.operation.value,
         )
 
-        # Prevent the same request ID from being accepted twice.
-        self.replay_store.claim_request(request.request_id)
+        # Save the complete request using the configured replay store.
+        self.replay_store.claim_request(request)
 
         return request

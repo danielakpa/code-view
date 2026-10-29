@@ -1,47 +1,51 @@
 """Prevent repeated CodeView sandbox operation requests."""
 
 from threading import Lock
-from uuid import UUID
+
+from server_runner.sandbox_controller.operation import (
+    SandboxOperationRequest,
+)
 
 
 class ReplayProtectionError(PermissionError):
-    """Raised when a request ID has already been used."""
+    """Raised when a request has already been used."""
 
 
 class InMemoryReplayStore:
     """
-    Store previously accepted request IDs.
+    Store accepted request IDs.
 
-    DEVELOPMENT ONLY:
-    This store does not survive application restarts.
+    Development and testing only.
     """
 
     def __init__(self):
-        """Initialize the replay store."""
+        """Create the replay store."""
 
-        # Store accepted request IDs.
+        # Keep track of accepted request IDs.
         self._request_ids = set()
 
-        # Prevent two threads from claiming the same ID simultaneously.
+        # Prevent simultaneous threads from claiming the same ID.
         self._lock = Lock()
 
-    def claim_request(self, request_id: UUID):
-        """Accept a request ID once and reject duplicates."""
+    def claim_request(self, request: SandboxOperationRequest):
+        """Accept an operation request only once."""
 
-        # Check that the ID is a valid, nonempty UUID.
-        if not isinstance(request_id, UUID) or request_id.int == 0:
-            raise ValueError("Invalid request ID.")
+        # Require a validated operation request.
+        if not isinstance(request, SandboxOperationRequest):
+            raise ValueError("Invalid sandbox operation request.")
 
-        # Lock while checking and saving the ID.
+        request_id = request.request_id
+
+        # Protect the check and update from concurrent threads.
         with self._lock:
 
-            # Reject an ID that has already been used.
+            # Reject duplicate request IDs.
             if request_id in self._request_ids:
                 raise ReplayProtectionError(
                     "Sandbox operation request has already been used."
                 )
 
-            # Save the new request ID.
+            # Remember the accepted request ID.
             self._request_ids.add(request_id)
 
         return True
