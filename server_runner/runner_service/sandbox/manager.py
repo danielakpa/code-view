@@ -1,5 +1,8 @@
 """Manage CodeView developer sandbox preparation."""
 
+# Import the function that saves sandbox records.
+from server_runner.runner_service.sandbox.repository import save_sandbox
+
 from dataclasses import dataclass, replace
 from pathlib import Path
 
@@ -103,3 +106,22 @@ class SandboxManager:
             sandbox,
             status=new_status,
         )
+
+    def prepare_and_save_sandbox(self, db, developer_id, group_id):
+        """Prepare a workspace and save its sandbox record."""
+
+        # Step 1: Prepare the developer's workspace.
+        sandbox = self.prepare_sandbox(
+            developer_id=developer_id,
+            group_id=group_id,
+        )
+
+        # Step 2: Save the sandbox information in PostgreSQL.
+        sandbox_record = save_sandbox(
+            db=db,
+            developer_id=sandbox.developer_id,
+            group_id=sandbox.group_id,
+        )
+
+        # Step 3: Return both the workspace and database record.
+        return sandbox, sandbox_record
