@@ -1,10 +1,9 @@
-"""Handle authorized sandbox operation requests."""
+"""Coordinate sandbox operations and PostgreSQL lifecycle changes."""
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from server_runner.runner_service.sandbox.database_authorization import (
-    authorize_database_sandbox_operation,
-)
+from server_runner.runner_service.models import SandboxRecord
 
 from server_runner.sandbox_controller.authorization import (
     SandboxIdentity,
@@ -14,7 +13,12 @@ from server_runner.sandbox_controller.database_replay import (
     DatabaseReplayStore,
 )
 
+from server_runner.sandbox_controller.lifecycle import (
+    SandboxLifecycle,
+)
+
 from server_runner.sandbox_controller.operation import (
+    SandboxOperation,
     SandboxOperationRequest,
 )
 
@@ -24,56 +28,120 @@ from server_runner.sandbox_controller.operation_service import (
 
 
 class SandboxOperationHandler:
-    """Validate and record sandbox operation requests."""
+    """Validate and record sandbox operations atomically."""
 
     def __init__(self, db: Session):
-        """Receive the PostgreSQL database session."""
+        """Initialize the operation handler."""
 
         self.db = db
 
-        # Use PostgreSQL instead of the in-memory replay store.
-        replay_store = DatabaseReplayStore(db)
-
-        # Connect replay protection to operation validation.
+        # Use PostgreSQL for replay protection.
         self.operation_service = SandboxOperationService(
-            replay_store=replay_store
+            replay_store=DatabaseReplayStore(db)
         )
+
+        # Reuse our existing lifecycle rules.
+        self.lifecycle = SandboxLifecycle()
 
     def handle(self, request: SandboxOperationRequest):
         """
-        Validate and record a sandbox operation request.
+        Validate and record a sandbox operation.
 
-        No Docker operation is performed here.
+        This method does not execute Docker commands.
+
+        SECURITY:
+        Do not expose this method to untrusted callers.
+        Request developer/group IDs are not authentication.
         """
 
-        # Step 1: Find the sandbox in PostgreSQL.
-        # Check whether its stored ownership matches the request.
-        sandbox_record = authorize_database_sandbox_operation(
-            db=self.db,
-            sandbox_id=request.sandbox_id,
-            developer_id=request.developer_id,
-            group_id=request.group_id,
-            operation=request.operation.value,
-        )
+        # Validate the request type.
+        if not isinstance(request, SandboxOperationRequest):
+            raise ValueError("Invalid sandbox operation request.")
 
-        # Step 2: Build the trusted identity from database data.
-        trusted_identity = SandboxIdentity(
-            sandbox_id=sandbox_record.sandbox_id,
-            developer_id=sandbox_record.developer_id,
-            group_id=sandbox_record.group_id,
-        )
+        try:
+            # Lock the sandbox record while processing the operation.
+            statement = (
+                select(SandboxRecord)
+                .where(
+                    SandboxRecord.sandbox_id == request.sandbox_id,
+                    SandboxRecord.developer_id == request.developer_id,
+                    SandboxRecord.group_id == request.group_id,
+                )
+                .with_for_update()
+            )
 
-        # Step 3: Validate the operation and claim its request ID.
-        self.operation_service.validate_and_claim(
-            request=request,
-            trusted_identity=trusted_identity,
-        )
+            sandbox = self.db.execute(
+                statement
+            ).scalar_one_or_none()
 
-        # Step 4: Return an acknowledgment.
-        # This does NOT mean Docker has started.
-        return {
-            "request_id": str(request.request_id),
-            "sandbox_id": str(request.sandbox_id),
-            "operation": request.operation.value,
-            "status": "recorded",
-        }
+            # Reject missing or mismatched sandbox records.
+            if sandbox is None:
+                raise PermissionError(
+                    "Sandbox not found or access denied."
+                )
+
+            # Build the identity using database information.
+            trusted_identity = SandboxIdentity(
+                sandbox_id=sandbox.sandbox_id,
+                developer_id=sandbox.developer_id,
+                group_id=sandbox.group_id,
+            )
+
+            # Decide which lifecycle transition is needed.
+            if request.operation == SandboxOperation.START:
+
+                new_status = self.lifecycle.transition(
+                    sandbox.status,
+                    "starting",
+                )
+
+            elif request.operation == SandboxOperation.STOP:
+
+                new_status = self.lifecycle.transition(
+                    sandbox.status,
+                    "stopped",
+                )
+
+            elif request.operation == SandboxOperation.INSPECT:
+
+                # Inspect does not change the sandbox's status.
+                new_status = sandbox.status
+
+            elif request.operation == SandboxOperation.CREATE:
+
+                # Creating a sandbox is handled separately.
+                # Do not create duplicate sandbox records here.
+                if sandbox.status != "prepared":
+                    raise ValueError(
+                        "Sandbox is already prepared or active."
+                    )
+
+                new_status = sandbox.status
+
+            else:
+                raise ValueError("Unsupported sandbox operation.")
+
+            # Verify the operation and record its request ID.
+            self.operation_service.validate_and_claim(
+                request=request,
+                trusted_identity=trusted_identity,
+            )
+
+            # Save the lifecycle change in the same transaction.
+            sandbox.status = new_status
+
+            # Commit the operation request and lifecycle update together.
+            self.db.commit()
+
+            return {
+                "request_id": str(request.request_id),
+                "sandbox_id": str(request.sandbox_id),
+                "operation": request.operation.value,
+                "status": "recorded",
+                "sandbox_status": sandbox.status,
+            }
+
+        except Exception:
+            # Undo both changes if anything fails.
+            self.db.rollback()
+            raise

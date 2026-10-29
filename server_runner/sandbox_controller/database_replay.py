@@ -25,22 +25,22 @@ class DatabaseReplayStore:
 
     def claim_request(self, request: SandboxOperationRequest):
         """
-        Save a request ID exactly once.
+        Insert a request ID into PostgreSQL.
 
-        PostgreSQL's primary key prevents duplicate claims,
-        including simultaneous requests from different processes.
+        IMPORTANT:
+        The caller owns the transaction.
+        This function does not commit or roll back.
         """
 
-        # Validate the incoming request model.
+        # Validate the request before accessing PostgreSQL.
         if not isinstance(request, SandboxOperationRequest):
             raise ValueError("Invalid sandbox operation request.")
 
-        # Validate the request UUID.
         if not isinstance(request.request_id, UUID):
             raise ValueError("Invalid request ID.")
 
         try:
-            # Insert the request into PostgreSQL.
+            # Insert the operation request.
             self.db.execute(
                 text(
                     """
@@ -69,16 +69,8 @@ class DatabaseReplayStore:
                 },
             )
 
-            # Commit the claim.
-            self.db.commit()
-
         except IntegrityError as error:
-
-            # PostgreSQL requires a rollback after a failed insert.
-            self.db.rollback()
-
-            # A primary-key collision means the request was used already.
-            # Other integrity errors should not be mislabeled as replay.
+            # Inspect the PostgreSQL error.
             sqlstate = getattr(
                 getattr(error.orig, "diag", None),
                 "sqlstate",
@@ -91,6 +83,7 @@ class DatabaseReplayStore:
                 None,
             )
 
+            # Identify duplicate operation request IDs.
             if (
                 sqlstate == "23505"
                 and constraint_name == "sandbox_operation_requests_pkey"
@@ -101,11 +94,5 @@ class DatabaseReplayStore:
 
             raise
 
-        except Exception:
-
-            # Roll back any other database failure.
-            self.db.rollback()
-
-            raise
-
+        # The caller decides when to commit.
         return True
