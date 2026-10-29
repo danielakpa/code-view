@@ -10,7 +10,7 @@ from uuid import UUID, uuid4
 from pydantic import BaseModel, Field
 
 # SQLAlchemy database column types.
-from sqlalchemy import DateTime, Integer, String
+from sqlalchemy import DateTime, Integer, String, Column
 from sqlalchemy.dialects.postgresql import UUID as PostgreSQLUUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -141,4 +141,11 @@ class SandboxRecord(Base):
         nullable=False,
         default=lambda: datetime.now(timezone.utc),
         onupdate=lambda: datetime.now(timezone.utc),
+    )
+    # Store the Docker container ID assigned to this sandbox.
+    # None means a Docker container has not been created yet.
+    container_id = Column(
+        String(64),
+        nullable=True,
+        unique=True,
     )

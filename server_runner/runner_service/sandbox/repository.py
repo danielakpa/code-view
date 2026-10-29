@@ -81,3 +81,115 @@ def update_sandbox_status(db: Session, sandbox_id, new_status: str):
 
     # Return the updated sandbox.
     return sandbox
+
+def get_owned_sandbox(
+    db: Session,
+    sandbox_id,
+    developer_id: int,
+    group_id: int,
+):
+    """Find a sandbox only when it belongs to the given developer and group."""
+
+    # Validate the developer ID.
+    if type(developer_id) is not int or developer_id <= 0:
+        raise ValueError("Invalid developer ID.")
+
+    # Validate the group ID.
+    if type(group_id) is not int or group_id <= 0:
+        raise ValueError("Invalid group ID.")
+
+    # Find the sandbox using its ID.
+    sandbox = db.get(SandboxRecord, sandbox_id)
+
+    # Reject missing sandboxes.
+    if sandbox is None:
+        raise ValueError("Sandbox not found or access denied.")
+
+    # Check whether the developer owns the sandbox.
+    if sandbox.developer_id != developer_id:
+        raise ValueError("Sandbox not found or access denied.")
+
+    # Check whether the sandbox belongs to the requested group.
+    if sandbox.group_id != group_id:
+        raise ValueError("Sandbox not found or access denied.")
+
+    # Return the sandbox only when ownership matches.
+    return sandbox
+
+def authorize_sandbox_operation(
+    db: Session,
+    sandbox_id,
+    developer_id: int,
+    group_id: int,
+    operation: str,
+):
+    """Authorize a developer's requested sandbox operation."""
+
+    # Define the sandbox operations we recognize.
+    allowed_operations = {
+        "start",
+        "stop",
+        "inspect",
+    }
+
+    # Reject unknown operations.
+    if operation not in allowed_operations:
+        raise ValueError("Invalid sandbox operation.")
+
+    # Verify that the sandbox belongs to this developer and group.
+    sandbox = get_owned_sandbox(
+        db=db,
+        sandbox_id=sandbox_id,
+        developer_id=developer_id,
+        group_id=group_id,
+    )
+
+    # Return the authorized sandbox record.
+    return sandbox
+
+def save_container_id(
+    db: Session,
+    sandbox_id,
+    developer_id: int,
+    group_id: int,
+    container_id: str,
+):
+    """Save a Docker container ID after verifying sandbox ownership."""
+
+    import re
+
+    # Accept only a full Docker container ID.
+    if not isinstance(container_id, str) or not re.fullmatch(
+        r"[a-fA-F0-9]{64}",
+        container_id,
+    ):
+        raise ValueError("Invalid Docker container ID.")
+
+    # Verify that the sandbox belongs to the developer and group.
+    sandbox = get_owned_sandbox(
+        db=db,
+        sandbox_id=sandbox_id,
+        developer_id=developer_id,
+        group_id=group_id,
+    )
+
+    # Prevent replacing an existing container ID.
+    if sandbox.container_id is not None:
+        raise ValueError("Sandbox already has a container.")
+
+    # Associate the container with this sandbox.
+    sandbox.container_id = container_id
+
+    try:
+        # Save the change in PostgreSQL.
+        db.commit()
+
+        # Reload the updated record.
+        db.refresh(sandbox)
+
+    except Exception:
+        # Undo the failed database transaction.
+        db.rollback()
+        raise
+
+    return sandbox
