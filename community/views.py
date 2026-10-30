@@ -1335,77 +1335,134 @@ def code_board(request, group_id):
         },
     )
 
-
 @login_required
 @require_POST
 def run_code_board(request, group_id):
-    """Authorize and execute the logged-in developer's saved Code Board."""
+    """
+    Execute code submitted directly from the browser.
 
-    # Step 1: Find only this developer's board in the requested group.
+    The source code is not saved to PostgreSQL.
+    """
+
+    # ========================================================
+    # STEP 1: FIND THE DEVELOPER'S CODE BOARD
+    # ========================================================
+
+    # A developer can execute only their own Code Board.
     board = GroupCodeBoard.objects.filter(
         group_id=group_id,
         owner=request.user,
     ).first()
 
+    # Reject requests for boards the developer does not own.
     if board is None:
         return JsonResponse(
             {"error": "Code Board not found or access denied."},
             status=404,
         )
 
-    # Step 2: Reuse the existing server-side authorization checks.
+    # ========================================================
+    # STEP 2: CHECK EXECUTION PERMISSIONS
+    # ========================================================
+
     try:
         authorized_board = authorize_code_board_execution(
             user=request.user,
             board_id=board.pk,
         )
+
     except PermissionError:
         return JsonResponse(
             {"error": "Code Board not found or access denied."},
             status=403,
         )
 
-    # Step 3: Only execute languages supported by the Runner.
-    if authorized_board.language not in {"python", "go", "javascript"}:
+    # ========================================================
+    # STEP 3: GET CODE DIRECTLY FROM THE BROWSER
+    # ========================================================
+
+    # Read the selected language from the POST request.
+    language = request.POST.get("language", "").strip().lower()
+
+    # Read the source code without saving it to the database.
+    source = request.POST.get("code", "")
+
+    # ========================================================
+    # STEP 4: VALIDATE THE LANGUAGE
+    # ========================================================
+
+    supported_languages = {
+        "python",
+        "go",
+        "javascript",
+    }
+
+    if language not in supported_languages:
         return JsonResponse(
-            {"error": "Code execution supports Python, Go, and JavaScript."},
+            {
+                "error": (
+                    "Code execution supports Python, "
+                    "Go, and JavaScript."
+                )
+            },
             status=400,
         )
 
-    # Step 4: Validate saved source before contacting the Runner.
-    source = authorized_board.code
-    if not isinstance(source, str) or not source.strip():
+    # ========================================================
+    # STEP 5: VALIDATE SOURCE CODE
+    # ========================================================
+
+    # Reject empty code.
+    if not source.strip():
         return JsonResponse(
-            {"error": "Save non-empty source code before running it."},
+            {"error": "Write some code before running it."},
             status=400,
         )
+
+    # Limit source code to 256 KiB.
     if len(source.encode("utf-8")) > 256 * 1024:
         return JsonResponse(
             {"error": "Source code exceeds the 256 KiB limit."},
             status=400,
         )
 
-    # Step 5: Django is synchronous here; bridge to the async HTTP client.
-    # IDs and source are read from authorized server-side records,
-    # not from user-submitted developer/group identifiers.
+    # ========================================================
+    # STEP 6: SEND EXECUTION REQUEST TO FASTAPI
+    # ========================================================
+
+    # Create the Runner client.
     runner = CodeExecutionRunnerClient()
+
     try:
+        # Django is synchronous, but the Runner client is async.
+        # async_to_sync allows us to call it from this view.
         result = async_to_sync(runner.request_execution)(
+            # Use trusted server-side IDs, never browser-supplied IDs.
             board_id=authorized_board.pk,
             developer_id=request.user.pk,
             group_id=authorized_board.group_id,
-            language=authorized_board.language,
+
+            # Use the current editor contents.
+            language=language,
             source=source,
         )
+
     except RunnerUnavailableError:
-        # Avoid exposing internal service addresses, tokens, or errors.
+        # Hide internal service details from the browser.
         return JsonResponse(
             {"error": "Code execution is temporarily unavailable."},
             status=503,
         )
 
-    # Step 6: Return the Runner's structured execution result.
-    return JsonResponse(result, status=200)
+    # ========================================================
+    # STEP 7: RETURN EXECUTION RESULT
+    # ========================================================
+
+    # Return stdout, stderr, exit code, and other Runner fields.
+    return JsonResponse(
+        result,
+        status=200,
+    )
 
 # ============================================================
 # 10. CREATE GROUP DISCUSSION
