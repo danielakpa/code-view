@@ -5,6 +5,9 @@
 # 1. PYTHON BUILT-IN MODULES
 # ============================================================
 
+# Reuse CodeView's Code Board execution authorization.
+from server_runner.services import authorize_code_board_execution
+
 # Used to convert JSON data into Python dictionaries and lists.
 import json
 
@@ -191,16 +194,22 @@ from .models import (
 # ============================================================
 # HELPER: CHECK GROUP MEMBERSHIP
 # ============================================================
-
 def is_group_member(group, user):
-    """Return True when the developer belongs to the group."""
+    """Check whether a developer owns or belongs to a group."""
 
+    # Step 1: Reject users who are not logged in.
+    if not user.is_authenticated:
+        return False
+
+    # Step 2: Allow the developer who created the group.
+    if group.owner_id == user.pk:
+        return True
+
+    # Step 3: Check whether the developer is an approved member.
     return GroupMember.objects.filter(
         group=group,
         user=user,
     ).exists()
-
-
 # ============================================================
 # 1. GROUPS DASHBOARD
 # ============================================================
@@ -1321,6 +1330,75 @@ def code_board(request, group_id):
             "repository": repository,
             "branches": branches,
         },
+    )
+
+
+@login_required
+@require_POST
+def run_code_board(request, group_id):
+    """
+    Validate a developer's request to execute their private Code Board.
+
+    Note:
+    This endpoint does not execute code yet.
+    """
+
+    # Step 1: Find the logged-in developer's Code Board.
+    board = GroupCodeBoard.objects.filter(
+        group_id=group_id,
+        owner=request.user,
+    ).first()
+
+    # Step 2: Reject requests without an owned Code Board.
+    if board is None:
+        return JsonResponse(
+            {"error": "Code Board not found or access denied."},
+            status=404,
+        )
+
+    try:
+        # Step 3: Verify group access and Code Board ownership.
+        authorized_board = authorize_code_board_execution(
+            user=request.user,
+            board_id=board.pk,
+        )
+
+    except PermissionError:
+        # Never reveal another developer's private Code Board.
+        return JsonResponse(
+            {"error": "Code Board not found or access denied."},
+            status=403,
+        )
+
+    # Step 4: Only these languages are supported by the Runner.
+    supported_languages = {
+        "python",
+        "go",
+        "javascript",
+    }
+
+    # Step 5: Reject unsupported programming languages.
+    if authorized_board.language not in supported_languages:
+        return JsonResponse(
+            {
+                "error": (
+                    "Code execution currently supports "
+                    "Python, Go, and JavaScript."
+                )
+            },
+            status=400,
+        )
+
+    # Step 6: Confirm authorization.
+    # Docker execution will be connected in a later step.
+    return JsonResponse(
+        {
+            "status": "authorized",
+            "message": "Code Board is authorized for execution.",
+            "board_id": authorized_board.pk,
+            "language": authorized_board.language,
+        },
+        status=200,
     )
 # ============================================================
 # 10. CREATE GROUP DISCUSSION

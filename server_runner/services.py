@@ -3,6 +3,9 @@
 # Import Django database transactions.
 from django.db import transaction
 
+# Access CodeView's private Code Board model.
+from community.models import GroupCodeBoard
+
 # Import CodeView's group membership model.
 from community.models import GroupMember
 
@@ -10,43 +13,107 @@ from community.models import GroupMember
 from server_runner.models import DeveloperTerminalSession
 
 
-@transaction.atomic
-def create_terminal_session(user, group):
-    """Create a terminal session for an authenticated group member."""
 
-    # Step 1: Verify that the developer is authenticated.
+def authorize_private_group_access(user, group):
+    """
+    Verify that a developer can access a private development group.
+
+    This function can be reused by:
+    - Developer terminals.
+    - Code execution.
+    - Other private developer features.
+    """
+
+    # Step 1: Reject unauthenticated developers.
     if not user.is_authenticated:
         raise PermissionError(
-            "You must log in to use the terminal."
+            "You must log in to access this development group."
         )
 
-    # Step 2: Only allow terminals inside private development groups.
+    # Step 2: Reject public groups.
     if not group.is_private:
         raise PermissionError(
-            "Terminals are only available in private development groups."
+            "This feature requires a private development group."
         )
 
     # Step 3: Check whether the developer owns the group.
     is_owner = group.owner_id == user.pk
 
-    # Step 4: Check whether the developer is an approved group member.
+    # Step 4: Check whether the developer is an approved member.
     is_member = GroupMember.objects.filter(
         group=group,
         user=user,
     ).exists()
 
-    # Step 5: Reject developers who are neither owners nor members.
+    # Step 5: Reject unauthorized developers.
     if not is_owner and not is_member:
         raise PermissionError(
-            "You do not have permission to use this group's terminal."
+            "You do not have permission to access this group."
         )
 
-    # Step 6: Create a new terminal session in PostgreSQL.
+    # Authorization succeeded.
+    return True
+
+def authorize_code_board_execution(user, board_id):
+    """
+    Verify that a developer can execute a private Code Board.
+
+    Checks:
+    1. Developer authentication.
+    2. Private-group membership.
+    3. Code Board ownership.
+    """
+
+    # Step 1: Reject unauthenticated developers.
+    if not user.is_authenticated:
+        raise PermissionError(
+            "You must log in to execute code."
+        )
+
+    # Step 2: Find the requested Code Board.
+    board = GroupCodeBoard.objects.select_related(
+        "group"
+    ).filter(
+        id=board_id
+    ).first()
+
+    # Step 3: Reject nonexistent Code Boards.
+    if board is None:
+        raise PermissionError(
+            "Code Board not found or access denied."
+        )
+
+    # Step 4: Verify access to the private development group.
+    authorize_private_group_access(
+        user=user,
+        group=board.group,
+    )
+
+    # Step 5: Verify that this developer owns the Code Board.
+    if board.owner_id != user.pk:
+        raise PermissionError(
+            "You cannot execute another developer's private Code Board."
+        )
+
+    # Step 6: Return the authorized Code Board.
+    return board
+
+@transaction.atomic
+def create_terminal_session(user, group):
+    """Create a terminal session for an authorized developer."""
+
+    # Step 1: Verify the developer's permission.
+    authorize_private_group_access(
+        user=user,
+        group=group,
+    )
+
+    # Step 2: Create a terminal session in PostgreSQL.
     session = DeveloperTerminalSession.objects.create(
         developer=user,
         group_id=group.pk,
         status="created",
     )
 
-    # Step 7: Return the newly created session.
+    # Step 3: Return the created session.
     return session

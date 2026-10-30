@@ -150,3 +150,57 @@ class TerminalRunnerClient:
             raise RunnerUnavailableError(
                 "Failed to send terminal heartbeat."
             ) from error
+
+
+class CodeExecutionRunnerClient:
+    """Communicate with FastAPI about Code Board execution."""
+
+    def __init__(self):
+        """Load the Runner connection settings."""
+
+        # FastAPI Runner's base URL.
+        self.base_url = settings.CODEVIEW_RUNNER_URL.rstrip("/")
+
+        # Shared authentication token for Django-to-Runner requests.
+        self.token = settings.CODEVIEW_RUNNER_TOKEN
+
+    async def request_execution(self, board_id, developer_id, group_id):
+        """
+        Request execution of an authorized developer's Code Board.
+
+        The FastAPI execution endpoint will be implemented later.
+        """
+
+        # Send Django's service authentication token.
+        headers = {
+            "Authorization": f"Bearer {self.token}",
+        }
+
+        # Identify the Code Board and its authorized owner.
+        payload = {
+            "board_id": board_id,
+            "developer_id": developer_id,
+            "group_id": group_id,
+        }
+
+        try:
+            # Create an asynchronous HTTP client.
+            async with httpx.AsyncClient(timeout=10.0) as client:
+
+                # Request code execution from FastAPI.
+                response = await client.post(
+                    f"{self.base_url}/internal/executions",
+                    headers=headers,
+                    json=payload,
+                )
+
+                # Reject unsuccessful HTTP responses.
+                response.raise_for_status()
+
+                # Return FastAPI's response.
+                return response.json()
+
+        except httpx.HTTPError as error:
+            raise RunnerUnavailableError(
+                "Failed to request Code Board execution."
+            ) from error

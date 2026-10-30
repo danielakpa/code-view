@@ -101,6 +101,13 @@ urlpatterns = [
         name="code_board",
     ),
 
+    # Execute the logged-in developer's private Code Board.
+    path(
+        "<int:group_id>/code/run/",
+        views.run_code_board,
+        name="run_code_board",
+    ),
+
     # ========================================================
     # 8. CREATE GROUP DISCUSSION
     # ========================================================

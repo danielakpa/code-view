@@ -127,5 +127,63 @@ class TestSandboxOperationHandler(unittest.TestCase):
         self.assertEqual(result["sandbox_status"], "starting")
 
 
+    def test_run_from_prepared_sandbox(self):
+        """Allow temporary execution without starting the main sandbox."""
+
+        # Create a Run operation request.
+        request = self.make_request(SandboxOperation.RUN)
+
+        # Record the operation.
+        result = self.handler.handle(request)
+
+        # Verify that the request was recorded.
+        self.assertEqual(result["operation"], "run")
+        self.assertEqual(result["status"], "recorded")
+
+        # Temporary execution must not change the main sandbox status.
+        self.assertEqual(self.sandbox.status, "prepared")
+
+        # Verify that the transaction was committed.
+        self.db.commit.assert_called_once()
+
+
+    def test_run_from_failed_sandbox_is_rejected(self):
+        """Reject temporary execution when the sandbox has failed."""
+
+        # Simulate a failed sandbox.
+        self.sandbox.status = "failed"
+
+        # Attempt to record a Run operation.
+        with self.assertRaises(ValueError):
+            self.handler.handle(
+                self.make_request(SandboxOperation.RUN)
+            )
+
+        # Failed operations must not be committed.
+        self.db.commit.assert_not_called()
+
+        # The database transaction must be rolled back.
+        self.db.rollback.assert_called_once()
+
+    def test_run_replay_failure_rolls_back(self):
+        """Reject Run requests when replay protection fails."""
+
+        # Simulate a duplicate or rejected request ID.
+        self.handler.operation_service.replay_store.claim_request.side_effect = (
+            RuntimeError("Duplicate Run request")
+        )
+
+        # Attempt to record the Run operation.
+        with self.assertRaises(RuntimeError):
+            self.handler.handle(
+                self.make_request(SandboxOperation.RUN)
+            )
+
+        # Do not commit rejected requests.
+        self.db.commit.assert_not_called()
+
+        # Undo the transaction.
+        self.db.rollback.assert_called_once()
+        
 if __name__ == "__main__":
     unittest.main()

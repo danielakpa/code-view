@@ -10,6 +10,7 @@ ALLOWED_SANDBOX_OPERATIONS = frozenset({
     "start",
     "stop",
     "inspect",
+    "run",
 })
 
 

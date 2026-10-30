@@ -14,6 +14,9 @@ class SandboxOperation(str, Enum):
     STOP = "stop"
     INSPECT = "inspect"
 
+    # Request to execute code in a temporary container.
+    RUN = "run"
+
 
 class SandboxOperationRequest(BaseModel):
     """

@@ -101,10 +101,41 @@ class SandboxOperationHandler:
                     sandbox.status,
                     "stopped",
                 )
-
             elif request.operation == SandboxOperation.INSPECT:
 
                 # Inspect does not change the sandbox's status.
+                new_status = sandbox.status
+
+            elif request.operation == SandboxOperation.RUN:
+
+                # The Run button uses a separate temporary container.
+                # It does not require the main sandbox to be running.
+
+                # Define which sandbox states permit temporary execution.
+                allowed_statuses = {
+                    "prepared",
+                    "running",
+                    "stopped",
+                }
+
+                # Reject sandboxes that are not ready for execution.
+                if sandbox.status not in allowed_statuses:
+                    raise ValueError(
+                        "Sandbox is not ready for code execution."
+                    )
+
+                # Temporary execution does not change the sandbox status.
+                new_status = sandbox.status
+
+            elif request.operation == SandboxOperation.CREATE:
+
+                # Creating a sandbox is handled separately.
+                # Do not create duplicate sandbox records here.
+                if sandbox.status != "prepared":
+                    raise ValueError(
+                        "Sandbox is already prepared or active."
+                    )
+
                 new_status = sandbox.status
 
             elif request.operation == SandboxOperation.CREATE:

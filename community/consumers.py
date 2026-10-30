@@ -70,9 +70,10 @@ class GroupChatConsumer(AsyncJsonWebsocketConsumer):
             self.room_group_name,
             self.channel_name,
         )
+        
+        # Accept the authenticated group chat connection.
+        await self.accept()
 
-         # Save the successful runner registration in PostgreSQL.
-        await self.mark_runner_registered()
     async def disconnect(self, close_code):
         """Remove the developer from the group's channel."""
 

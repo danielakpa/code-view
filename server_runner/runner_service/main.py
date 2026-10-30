@@ -3,6 +3,16 @@
 # Import os to read configuration from environment variables.
 import os
 
+# Verify that an execution sandbox belongs to the requested developer/group.
+from server_runner.runner_service.execution_authorization import (
+    authorize_execution_sandbox,
+    ExecutionSandboxNotFoundError,
+)
+
+from server_runner.runner_service.execution_request import (
+    CodeExecutionRequest,
+)
+
 # Import secrets for secure token comparison.
 import secrets
 
@@ -267,3 +277,56 @@ def heartbeat_runner_session(
         "session_id": str(session.session_id),
         "status": "active",
     }
+@app.post("/internal/executions")
+def request_code_execution(
+    request: CodeExecutionRequest,
+    authenticated: bool = Depends(verify_runner_token),
+    db: Session = Depends(get_db),
+):
+    """Validate sandbox ownership before allowing code execution."""
+
+    try:
+        # Find the developer's existing sandbox in PostgreSQL.
+        sandbox = authorize_execution_sandbox(
+            db=db,
+            developer_id=request.developer_id,
+            group_id=request.group_id,
+        )
+
+    except ExecutionSandboxNotFoundError:
+        # The developer does not have a sandbox for this group.
+        raise HTTPException(
+            status_code=404,
+            detail="Execution sandbox was not found.",
+        )
+
+    except PermissionError:
+        # Reject requests that fail sandbox ownership authorization.
+        raise HTTPException(
+            status_code=403,
+            detail="Sandbox access denied.",
+        )
+
+    except ValueError:
+        # The sandbox exists but is not ready for execution.
+        raise HTTPException(
+            status_code=409,
+            detail="Sandbox is not ready for execution.",
+        )
+
+    except SQLAlchemyError:
+        # Roll back the failed database transaction.
+        db.rollback()
+
+        raise HTTPException(
+            status_code=503,
+            detail="Runner database operation failed.",
+        )
+
+    # The sandbox has passed the database authorization checks.
+    # Do not execute code yet: the remaining security connections
+    # are not complete.
+    raise HTTPException(
+        status_code=501,
+        detail="Code execution is not enabled yet.",
+    )
