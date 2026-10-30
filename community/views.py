@@ -5,6 +5,9 @@
 # 1. PYTHON BUILT-IN MODULES
 # ============================================================
 
+# Import HttpResponse to return an HTTP response to the browser.
+from django.http import HttpResponse
+
 # Reuse CodeView's Code Board execution authorization.
 from server_runner.services import authorize_code_board_execution
 

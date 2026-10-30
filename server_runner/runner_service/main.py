@@ -299,15 +299,21 @@ def prepare_developer_sandbox(
         ) from error
 
     except (SQLAlchemyError, OSError) as error:
-        # Undo any uncommitted database changes.
+
+        # Print the actual database or filesystem error.
+        # This information stays in the backend terminal.
+        # Do not send internal error details to the browser.
+        import traceback
+        traceback.print_exc()
+
+        # Roll back any unfinished database transaction.
         db.rollback()
 
-        # Avoid exposing internal database or filesystem details.
+        # Return a safe error message to Django.
         raise HTTPException(
             status_code=503,
-            detail="Sandbox preparation failed.",
+            detail="Sandbox preparation failed."
         ) from error
-
 # ============================================================
 # 10. DISCONNECT RUNNER SESSION
 # ============================================================

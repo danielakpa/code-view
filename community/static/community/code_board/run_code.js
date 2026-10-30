@@ -113,7 +113,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
             const stderr = result.stderr || "";
 
-            const exitCode = result.exit_code;
+            // Read the exit code returned by the FastAPI execution pipeline.
+            // 0 means the program completed successfully.
+            const exitCode = result.return_code;
 
             // Combine normal output and error output.
             const messages = [];
@@ -134,12 +136,26 @@ document.addEventListener("DOMContentLoaded", () => {
             // Show the execution output.
             output.textContent = messages.join("\n");
 
-            // Show whether execution succeeded.
-            if (exitCode === 0) {
-                status.textContent = "Completed";
-            } else {
-                status.textContent = "Execution finished";
-            }
+// Check whether execution exceeded the allowed time.
+if (result.timed_out === true) {
+
+    status.textContent = "Timed out";
+
+    // Explain the timeout when no error output was returned.
+    if (!stderr) {
+        output.textContent += "\nExecution exceeded the time limit.";
+    }
+
+} else if (exitCode === 0) {
+
+    // The program executed successfully.
+    status.textContent = "Completed";
+
+} else {
+
+    // The program ran but returned a nonzero exit code.
+    status.textContent = "Execution failed";
+}
 
         } catch (error) {
 
