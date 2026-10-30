@@ -1,65 +1,99 @@
 """Coordinate sandbox operations and PostgreSQL lifecycle changes."""
 
+# ============================================================
+# 1. DATABASE IMPORTS
+# ============================================================
+
+# Build database queries.
 from sqlalchemy import select
+
+# Manage PostgreSQL database sessions.
 from sqlalchemy.orm import Session
 
+
+# ============================================================
+# 2. CODEVIEW IMPORTS
+# ============================================================
+
+# Database model representing a developer's sandbox.
 from server_runner.runner_service.models import SandboxRecord
 
+# Represent trusted sandbox ownership information.
 from server_runner.sandbox_controller.authorization import (
     SandboxIdentity,
 )
 
+# Store operation request IDs in PostgreSQL for replay protection.
 from server_runner.sandbox_controller.database_replay import (
     DatabaseReplayStore,
 )
 
+# Enforce valid sandbox lifecycle transitions.
 from server_runner.sandbox_controller.lifecycle import (
     SandboxLifecycle,
 )
 
+# Define supported sandbox operations and request validation.
 from server_runner.sandbox_controller.operation import (
     SandboxOperation,
     SandboxOperationRequest,
 )
 
+# Validate operations and claim request IDs.
 from server_runner.sandbox_controller.operation_service import (
     SandboxOperationService,
 )
 
 
+# ============================================================
+# 3. SANDBOX OPERATION HANDLER
+# ============================================================
+
 class SandboxOperationHandler:
-    """Validate and record sandbox operations atomically."""
+    """Authorize, validate, and record sandbox operations atomically."""
 
     def __init__(self, db: Session):
-        """Initialize the operation handler."""
+        """Initialize the handler with a PostgreSQL database session."""
 
+        # Store the database session.
         self.db = db
 
-        # Use PostgreSQL for replay protection.
+        # Use PostgreSQL to prevent replayed operation requests.
         self.operation_service = SandboxOperationService(
             replay_store=DatabaseReplayStore(db)
         )
 
-        # Reuse our existing lifecycle rules.
+        # Reuse CodeView's existing sandbox lifecycle rules.
         self.lifecycle = SandboxLifecycle()
 
     def handle(self, request: SandboxOperationRequest):
         """
-        Validate and record a sandbox operation.
+        Validate and record an authorized sandbox operation.
 
         This method does not execute Docker commands.
 
         SECURITY:
-        Do not expose this method to untrusted callers.
-        Request developer/group IDs are not authentication.
+        Developer and group IDs supplied in a request are not proof
+        of authentication. The calling service must be authenticated.
         """
 
-        # Validate the request type.
+        # ----------------------------------------------------
+        # STEP 1: VALIDATE THE REQUEST TYPE
+        # ----------------------------------------------------
+
         if not isinstance(request, SandboxOperationRequest):
-            raise ValueError("Invalid sandbox operation request.")
+            raise ValueError(
+                "Invalid sandbox operation request."
+            )
 
         try:
-            # Lock the sandbox record while processing the operation.
+            # ------------------------------------------------
+            # STEP 2: FIND AND LOCK THE SANDBOX
+            # ------------------------------------------------
+
+            # Lock the matching database row until the transaction
+            # finishes. This helps prevent concurrent operations
+            # from changing the sandbox at the same time.
             statement = (
                 select(SandboxRecord)
                 .where(
@@ -74,22 +108,30 @@ class SandboxOperationHandler:
                 statement
             ).scalar_one_or_none()
 
-            # Reject missing or mismatched sandbox records.
+            # Reject missing sandboxes and ownership mismatches.
             if sandbox is None:
                 raise PermissionError(
                     "Sandbox not found or access denied."
                 )
 
-            # Build the identity using database information.
+            # ------------------------------------------------
+            # STEP 3: BUILD TRUSTED SANDBOX IDENTITY
+            # ------------------------------------------------
+
+            # Use ownership information retrieved from PostgreSQL.
             trusted_identity = SandboxIdentity(
                 sandbox_id=sandbox.sandbox_id,
                 developer_id=sandbox.developer_id,
                 group_id=sandbox.group_id,
             )
 
-            # Decide which lifecycle transition is needed.
+            # ------------------------------------------------
+            # STEP 4: CHECK THE REQUESTED OPERATION
+            # ------------------------------------------------
+
             if request.operation == SandboxOperation.START:
 
+                # Ask the lifecycle system to validate starting.
                 new_status = self.lifecycle.transition(
                     sandbox.status,
                     "starting",
@@ -97,41 +139,41 @@ class SandboxOperationHandler:
 
             elif request.operation == SandboxOperation.STOP:
 
+                # Ask the lifecycle system to validate stopping.
                 new_status = self.lifecycle.transition(
                     sandbox.status,
                     "stopped",
                 )
+
             elif request.operation == SandboxOperation.INSPECT:
 
-                # Inspect does not change the sandbox's status.
+                # Inspection does not change sandbox status.
                 new_status = sandbox.status
 
             elif request.operation == SandboxOperation.RUN:
 
-                # The Run button uses a separate temporary container.
-                # It does not require the main sandbox to be running.
+                # Code execution uses a separate temporary
+                # container rather than the main sandbox.
 
-                # Define which sandbox states permit temporary execution.
                 allowed_statuses = {
                     "prepared",
                     "running",
                     "stopped",
                 }
 
-                # Reject sandboxes that are not ready for execution.
+                # Reject sandboxes that are not ready.
                 if sandbox.status not in allowed_statuses:
                     raise ValueError(
                         "Sandbox is not ready for code execution."
                     )
 
-                # Temporary execution does not change the sandbox status.
+                # Temporary execution does not change status.
                 new_status = sandbox.status
-
 
             elif request.operation == SandboxOperation.CREATE:
 
-                # Creating a sandbox is handled separately.
-                # Do not create duplicate sandbox records here.
+                # Sandbox creation is handled separately.
+                # Reject attempts to recreate an active sandbox.
                 if sandbox.status != "prepared":
                     raise ValueError(
                         "Sandbox is already prepared or active."
@@ -140,19 +182,37 @@ class SandboxOperationHandler:
                 new_status = sandbox.status
 
             else:
-                raise ValueError("Unsupported sandbox operation.")
+                raise ValueError(
+                    "Unsupported sandbox operation."
+                )
 
-            # Verify the operation and record its request ID.
+            # ------------------------------------------------
+            # STEP 5: AUTHORIZE AND CLAIM THE REQUEST ID
+            # ------------------------------------------------
+
+            # Verify the operation against the trusted identity.
+            #
+            # The replay store records the request ID to prevent
+            # the same operation from being processed again.
             self.operation_service.validate_and_claim(
                 request=request,
                 trusted_identity=trusted_identity,
             )
 
-            # Save the lifecycle change in the same transaction.
+            # ------------------------------------------------
+            # STEP 6: SAVE THE LIFECYCLE CHANGE
+            # ------------------------------------------------
+
+            # Update the sandbox status.
             sandbox.status = new_status
 
-            # Commit the operation request and lifecycle update together.
+            # Commit the operation claim and lifecycle update
+            # in the same PostgreSQL transaction.
             self.db.commit()
+
+            # ------------------------------------------------
+            # STEP 7: RETURN THE OPERATION RESULT
+            # ------------------------------------------------
 
             return {
                 "request_id": str(request.request_id),
@@ -163,6 +223,11 @@ class SandboxOperationHandler:
             }
 
         except Exception:
-            # Undo both changes if anything fails.
+
+            # Undo all database changes if any operation fails.
+            #
+            # This includes unsuccessful lifecycle transitions
+            # and replay-protection claims.
             self.db.rollback()
+
             raise

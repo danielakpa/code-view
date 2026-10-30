@@ -1,56 +1,84 @@
 """Main entry point for the CodeView Runner Service."""
 
-# Import os to read configuration from environment variables.
+# ============================================================
+# 1. PYTHON BUILT-IN MODULES
+# ============================================================
+
+# Read configuration from environment variables.
 import os
 
-# Verify that an execution sandbox belongs to the requested developer/group.
+# Compare authentication tokens securely.
+import secrets
+
+# Generate unique execution request IDs.
+from uuid import UUID, uuid4
+
+# Record session heartbeat timestamps.
+from datetime import datetime, timezone
+
+# Locate the project's root directory.
+from pathlib import Path
+
+
+# ============================================================
+# 2. THIRD-PARTY LIBRARIES
+# ============================================================
+
+# Handle HTTP communication errors from the Sandbox Controller.
+import httpx
+
+# FastAPI handles incoming HTTP requests.
+from fastapi import Depends, FastAPI, Header, HTTPException, status
+
+# Validate incoming API request data.
+from pydantic import BaseModel, Field
+
+# Handle database errors.
+from sqlalchemy.exc import SQLAlchemyError
+
+# Manage PostgreSQL database sessions.
+from sqlalchemy.orm import Session
+
+
+# ============================================================
+# 3. CODEVIEW IMPORTS
+# ============================================================
+
+# Verify that an execution sandbox belongs to the developer/group.
 from server_runner.runner_service.execution_authorization import (
     authorize_execution_sandbox,
     ExecutionSandboxNotFoundError,
 )
 
+# Validate incoming execution requests.
 from server_runner.runner_service.execution_request import (
     CodeExecutionRequest,
 )
 
-# Import secrets for secure token comparison.
-import secrets
-
-# FastAPI creates our API application and handles HTTP requests.
-from fastapi import Depends, FastAPI, Header, HTTPException, status
-
-# Locate the project's root directory.
-from pathlib import Path
-
-# Load environment variables from a .env file.
-from dotenv import load_dotenv
-
-# Validate incoming API request data.
-from pydantic import BaseModel, Field
-
-# Validate session identifiers.
-from uuid import UUID
-
-# Create database sessions for FastAPI requests.
-from sqlalchemy.orm import Session
-
-# Handle database errors.
-from sqlalchemy.exc import SQLAlchemyError
-
-# Access the runner's PostgreSQL connection.
+# Access the Runner's PostgreSQL connection.
 from server_runner.runner_service.database import get_db
 
-# Access the runner session database model.
+# Access the Runner session database model.
 from server_runner.runner_service.models import RunnerSessionRecord
 
+# Communicate with the Sandbox Controller.
+from server_runner.controller_client import ControllerClient
 
-# Create the runner service application.
+
+# ============================================================
+# 4. FASTAPI APPLICATION
+# ============================================================
+
 app = FastAPI(
     title="CodeView Runner Service",
     description="Private service for managing CodeView developer environments.",
     version="1.0.0",
 )
 
+
+# ============================================================
+# 5. REQUEST MODELS
+# ============================================================
 
 class CreateRunnerSessionRequest(BaseModel):
     """Describe a terminal session registered by Django."""
@@ -63,24 +91,28 @@ class CreateRunnerSessionRequest(BaseModel):
 
     # Private group containing the developer.
     group_id: int = Field(gt=0)
-    
+
+
+# ============================================================
+# 6. INTERNAL AUTHENTICATION
+# ============================================================
 
 def verify_runner_token(
     authorization: str | None = Header(default=None),
 ):
-    """Verify that a request has the correct runner service token."""
+    """Verify that a request has the correct Runner service token."""
 
     # Read the expected token from the environment.
     expected_token = os.environ.get("CODEVIEW_RUNNER_TOKEN")
 
-    # Refuse requests if the service token is not configured.
+    # Refuse requests if authentication is not configured.
     if not expected_token:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Runner authentication is not configured.",
         )
 
-    # Require the Authorization header to use the Bearer scheme.
+    # Require the Bearer authentication scheme.
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -90,20 +122,23 @@ def verify_runner_token(
     # Extract the token supplied by the client.
     provided_token = authorization.removeprefix("Bearer ")
 
-    # Compare tokens using a timing-safe comparison.
+    # Compare tokens without exposing timing information.
     if not secrets.compare_digest(provided_token, expected_token):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid runner service token.",
         )
 
-    # Authentication succeeded.
     return True
 
 
+# ============================================================
+# 7. HEALTH ENDPOINT
+# ============================================================
+
 @app.get("/health")
 def health_check():
-    """Check whether the runner service is running."""
+    """Check whether the Runner service is running."""
 
     return {
         "service": "codeview-runner",
@@ -111,17 +146,27 @@ def health_check():
     }
 
 
+# ============================================================
+# 8. RUNNER STATUS
+# ============================================================
+
 @app.get("/internal/status")
 def runner_status(
     authenticated: bool = Depends(verify_runner_token),
 ):
-    """Return runner information to an authenticated internal client."""
+    """Return Runner information to an authenticated client."""
 
     return {
         "service": "codeview-runner",
         "authenticated": authenticated,
         "status": "ready",
     }
+
+
+# ============================================================
+# 9. CREATE RUNNER SESSION
+# ============================================================
+
 @app.post("/internal/sessions")
 def create_runner_session(
     request: CreateRunnerSessionRequest,
@@ -131,14 +176,15 @@ def create_runner_session(
     """Register a developer terminal session in PostgreSQL."""
 
     try:
-        # Check whether this session already exists.
+        # Check whether the session already exists.
         existing_session = db.get(
             RunnerSessionRecord,
             request.session_id,
         )
 
         if existing_session:
-            # Reject attempts to reuse an ID for another developer/group.
+
+            # Reject attempts to reuse another developer's session ID.
             if (
                 existing_session.developer_id != request.developer_id
                 or existing_session.group_id != request.group_id
@@ -148,7 +194,7 @@ def create_runner_session(
                     detail="Session ID belongs to another developer or group.",
                 )
 
-            # Do not reactivate disconnected sessions accidentally.
+            # Do not accidentally reactivate disconnected sessions.
             return {
                 "session_id": str(existing_session.session_id),
                 "developer_id": existing_session.developer_id,
@@ -156,7 +202,7 @@ def create_runner_session(
                 "status": existing_session.status,
             }
 
-        # Create a new runner session record.
+        # Create a new session record.
         session = RunnerSessionRecord(
             session_id=request.session_id,
             developer_id=request.developer_id,
@@ -164,10 +210,10 @@ def create_runner_session(
             status="registered",
         )
 
-        # Add the record to the database transaction.
+        # Add the session to the database transaction.
         db.add(session)
 
-        # Save the record permanently.
+        # Save the session.
         db.commit()
 
         return {
@@ -181,7 +227,6 @@ def create_runner_session(
         raise
 
     except SQLAlchemyError:
-        # Undo any unsuccessful database changes.
         db.rollback()
 
         raise HTTPException(
@@ -189,32 +234,37 @@ def create_runner_session(
             detail="Runner database operation failed.",
         )
 
+
+# ============================================================
+# 10. DISCONNECT RUNNER SESSION
+# ============================================================
+
 @app.post("/internal/sessions/{session_id}/disconnect")
 def disconnect_runner_session(
     session_id: UUID,
     authenticated: bool = Depends(verify_runner_token),
     db: Session = Depends(get_db),
 ):
-    """Mark a runner session as disconnected."""
+    """Mark a Runner session as disconnected."""
 
     try:
-        # Find the existing session.
+        # Find the session.
         session = db.get(
             RunnerSessionRecord,
             session_id,
         )
 
-        # Reject unknown session IDs.
+        # Reject unknown sessions.
         if session is None:
             raise HTTPException(
                 status_code=404,
                 detail="Runner session not found.",
             )
 
-        # Update the runner session status.
+        # Mark the session as disconnected.
         session.status = "disconnected"
 
-        # Save the change in PostgreSQL.
+        # Save the change.
         db.commit()
 
         return {
@@ -233,6 +283,11 @@ def disconnect_runner_session(
             detail="Runner database operation failed.",
         )
 
+
+# ============================================================
+# 11. RUNNER SESSION HEARTBEAT
+# ============================================================
+
 @app.post("/internal/sessions/{session_id}/heartbeat")
 def heartbeat_runner_session(
     session_id: UUID,
@@ -241,8 +296,11 @@ def heartbeat_runner_session(
 ):
     """Update the last activity time of a registered session."""
 
-    # Find the terminal session in PostgreSQL.
-    session = db.get(RunnerSessionRecord, session_id)
+    # Find the terminal session.
+    session = db.get(
+        RunnerSessionRecord,
+        session_id,
+    )
 
     # Reject unknown sessions.
     if session is None:
@@ -258,16 +316,16 @@ def heartbeat_runner_session(
             detail="Runner session is not active.",
         )
 
-    # Update the session's last activity time.
-    from datetime import datetime, timezone
-
+    # Update the session's activity timestamp.
     session.updated_at = datetime.now(timezone.utc)
 
-    # Save the heartbeat in PostgreSQL.
     try:
+        # Save the heartbeat.
         db.commit()
+
     except SQLAlchemyError:
         db.rollback()
+
         raise HTTPException(
             status_code=503,
             detail="Failed to save session heartbeat.",
@@ -277,16 +335,41 @@ def heartbeat_runner_session(
         "session_id": str(session.session_id),
         "status": "active",
     }
+
+
+# ============================================================
+# 12. CODE EXECUTION ENDPOINT
+# ============================================================
+
 @app.post("/internal/executions")
 def request_code_execution(
     request: CodeExecutionRequest,
     authenticated: bool = Depends(verify_runner_token),
     db: Session = Depends(get_db),
 ):
-    """Validate sandbox ownership before allowing code execution."""
+    """
+    Authorize a developer's sandbox and request code execution.
+
+    Execution flow:
+
+    Django
+        |
+        v
+    FastAPI Runner
+        |
+        v
+    Sandbox Controller
+        |
+        v
+    Docker execution
+    """
+
+    # --------------------------------------------------------
+    # STEP 1: VERIFY SANDBOX OWNERSHIP
+    # --------------------------------------------------------
 
     try:
-        # Find the developer's existing sandbox in PostgreSQL.
+        # Find the developer's sandbox in PostgreSQL.
         sandbox = authorize_execution_sandbox(
             db=db,
             developer_id=request.developer_id,
@@ -294,28 +377,24 @@ def request_code_execution(
         )
 
     except ExecutionSandboxNotFoundError:
-        # The developer does not have a sandbox for this group.
         raise HTTPException(
             status_code=404,
             detail="Execution sandbox was not found.",
         )
 
     except PermissionError:
-        # Reject requests that fail sandbox ownership authorization.
         raise HTTPException(
             status_code=403,
             detail="Sandbox access denied.",
         )
 
     except ValueError:
-        # The sandbox exists but is not ready for execution.
         raise HTTPException(
             status_code=409,
             detail="Sandbox is not ready for execution.",
         )
 
     except SQLAlchemyError:
-        # Roll back the failed database transaction.
         db.rollback()
 
         raise HTTPException(
@@ -323,10 +402,91 @@ def request_code_execution(
             detail="Runner database operation failed.",
         )
 
-    # The sandbox has passed the database authorization checks.
-    # Do not execute code yet: the remaining security connections
-    # are not complete.
-    raise HTTPException(
-        status_code=501,
-        detail="Code execution is not enabled yet.",
-    )
+    # --------------------------------------------------------
+    # STEP 2: GENERATE A UNIQUE EXECUTION REQUEST ID
+    # --------------------------------------------------------
+
+    # Every execution request gets its own UUID.
+    #
+    # The Controller uses this ID for replay protection.
+    execution_request_id = uuid4()
+
+    # --------------------------------------------------------
+    # STEP 3: SEND EXECUTION REQUEST TO CONTROLLER
+    # --------------------------------------------------------
+
+    try:
+        # Create the internal Controller client.
+        controller = ControllerClient()
+
+        # Forward the authorized execution request.
+        result = controller.execute_code(
+            request_id=execution_request_id,
+            sandbox_id=sandbox.sandbox_id,
+            developer_id=request.developer_id,
+            group_id=request.group_id,
+            language=request.language,
+            source=request.source,
+        )
+
+    # --------------------------------------------------------
+    # STEP 4: HANDLE CONTROLLER HTTP ERRORS
+    # --------------------------------------------------------
+
+    except httpx.HTTPStatusError as error:
+
+        # Read the HTTP status returned by the Controller.
+        controller_status = error.response.status_code
+
+        # Preserve known authorization and lifecycle failures.
+        if controller_status in {
+            401,
+            403,
+            404,
+            409,
+            422,
+        }:
+            raise HTTPException(
+                status_code=controller_status,
+                detail="Sandbox Controller rejected the execution request.",
+            )
+
+        # Other Controller errors are treated as service failures.
+        raise HTTPException(
+            status_code=503,
+            detail="Sandbox Controller could not complete execution.",
+        )
+
+    # --------------------------------------------------------
+    # STEP 5: HANDLE CONNECTION ERRORS
+    # --------------------------------------------------------
+
+    except httpx.RequestError:
+        raise HTTPException(
+            status_code=503,
+            detail="Sandbox Controller is unavailable.",
+        )
+
+    # --------------------------------------------------------
+    # STEP 6: HANDLE CONTROLLER CONFIGURATION ERRORS
+    # --------------------------------------------------------
+
+    except RuntimeError:
+        raise HTTPException(
+            status_code=503,
+            detail="Sandbox Controller is not configured.",
+        )
+
+    # --------------------------------------------------------
+    # STEP 7: RETURN EXECUTION RESULT
+    # --------------------------------------------------------
+
+    # The result may include:
+    #
+    # - execution status
+    # - standard output
+    # - standard error
+    # - exit code
+    #
+    # Return the Controller's response to Django.
+    return result

@@ -1,46 +1,94 @@
-"""Validate code execution requests received by the Controller."""
+"""Validate code execution requests received by the Sandbox Controller."""
 
-from pydantic import BaseModel, ConfigDict, model_validator
+# ============================================================
+# 1. IMPORTS
+# ============================================================
 
-from server_runner.sandbox_controller.code_snapshot import (
-    prepare_code_snapshot,
+# Restrict programming languages to supported values.
+from typing import Literal
+
+# Validate incoming request data.
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    model_validator,
 )
 
+# Import the sandbox operation request model.
 from server_runner.sandbox_controller.operation import (
-    SandboxOperation,
     SandboxOperationRequest,
 )
 
 
+# ============================================================
+# 2. CONTROLLER EXECUTION REQUEST
+# ============================================================
+
 class ControllerExecutionRequest(BaseModel):
-    """Represent a code execution request from the trusted Runner."""
+    """
+    Describe a code execution request sent by the FastAPI Runner.
 
-    # Reject unexpected request fields.
-    model_config = ConfigDict(extra="forbid")
+    The request contains:
 
-    # Identify the sandbox, developer, group, and operation.
+    1. Sandbox operation and ownership information.
+    2. The programming language.
+    3. The source code to execute.
+    """
+
+    # Reject unexpected fields and incorrect data types.
+    model_config = ConfigDict(
+        extra="forbid",
+        strict=True,
+    )
+
+    # Information used for sandbox authorization
+    # and replay protection.
     operation_request: SandboxOperationRequest
 
-    # Programming language selected in the Code Board.
-    language: str
+    # Only allow supported programming languages.
+    language: Literal[
+        "python",
+        "go",
+        "javascript",
+    ]
 
-    # Source code submitted for execution.
-    source: str
+    # Source code must contain at least one character.
+    #
+    # The validator below also checks whitespace and byte size.
+    source: str = Field(min_length=1)
+
+    # ========================================================
+    # 3. VALIDATE EXECUTION REQUEST
+    # ========================================================
 
     @model_validator(mode="after")
-    def validate_execution(self):
-        """Verify the operation and source code."""
+    def validate_execution_request(self):
+        """Check the requested operation and source code."""
 
-        # This endpoint only accepts RUN operations.
-        if self.operation_request.operation != SandboxOperation.RUN:
+        # STEP 1: Only the "run" operation can execute code.
+        if self.operation_request.operation != "run":
             raise ValueError(
-                "Only RUN operations are allowed."
+                "Code execution requires the run operation."
             )
 
-        # Reuse the existing source-code validation.
-        prepare_code_snapshot(
-            language=self.language,
-            source=self.source,
+        # STEP 2: Reject empty or whitespace-only source code.
+        if not self.source.strip():
+            raise ValueError(
+                "Source code cannot be empty."
+            )
+
+        # STEP 3: Limit source code to 256 KiB.
+        #
+        # UTF-8 encoding measures the actual number of bytes.
+        source_size = len(
+            self.source.encode("utf-8")
         )
 
+        if source_size > 256 * 1024:
+            raise ValueError(
+                "Source code exceeds the 256 KiB limit."
+            )
+
+        # STEP 4: Return the validated request.
         return self

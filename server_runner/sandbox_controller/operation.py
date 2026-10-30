@@ -1,58 +1,85 @@
-"""Define and validate CodeView sandbox operation requests."""
+"""Define and validate CodeView Sandbox Controller operations."""
 
+# ============================================================
+# 1. IMPORTS
+# ============================================================
+
+# Create an enumeration of supported sandbox operations.
 from enum import Enum
+
+# Validate unique identifiers.
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+# Validate incoming request data.
+from pydantic import BaseModel, ConfigDict, Field
 
+
+# ============================================================
+# 2. SUPPORTED SANDBOX OPERATIONS
+# ============================================================
 
 class SandboxOperation(str, Enum):
-    """List operations supported by the controller."""
+    """
+    Define the operations supported by the Sandbox Controller.
 
+    Each operation represents an action that can be performed
+    on a developer's sandbox.
+    """
+
+    # Register a new sandbox.
     CREATE = "create"
+
+    # Start a prepared or stopped sandbox.
     START = "start"
+
+    # Stop a running sandbox.
     STOP = "stop"
+
+    # Inspect sandbox information.
     INSPECT = "inspect"
 
-    # Request to execute code in a temporary container.
+    # Execute code using a temporary container.
     RUN = "run"
 
 
+# ============================================================
+# 3. SANDBOX OPERATION REQUEST
+# ============================================================
+
 class SandboxOperationRequest(BaseModel):
     """
-    Represent a sandbox operation request.
+    Describe an operation requested for a developer's sandbox.
 
-    This model validates the request's structure.
-    It does not independently prove developer authorization.
+    The Controller uses this information to identify:
+
+    1. The operation request.
+    2. The sandbox being accessed.
+    3. The developer requesting access.
+    4. The private group containing the sandbox.
+    5. The operation to perform.
     """
 
-    # Reject unexpected fields.
-    model_config = ConfigDict(extra="forbid", strict=True)
+    # Reject unexpected fields and incorrect data types.
+    model_config = ConfigDict(
+        extra="forbid",
+        strict=True,
+    )
 
-    # Unique identifier for this request.
+    # Unique identifier for this operation request.
+    #
+    # Used by the replay-protection system.
     request_id: UUID
 
-    # Unique identifier for the sandbox.
+    # Unique identifier of the sandbox being accessed.
     sandbox_id: UUID
 
-    # Developer associated with the sandbox.
+    # Developer requesting the operation.
     developer_id: int = Field(gt=0)
 
-    # Group associated with the sandbox.
+    # Private group containing the sandbox.
     group_id: int = Field(gt=0)
 
     # Requested sandbox operation.
+    #
+    # Using the enum prevents unsupported operations.
     operation: SandboxOperation
-
-    @model_validator(mode="after")
-    def validate_request(self):
-        """Perform additional validation of the request."""
-
-        # Reject nil UUIDs.
-        if self.request_id.int == 0:
-            raise ValueError("Request ID cannot be empty.")
-
-        if self.sandbox_id.int == 0:
-            raise ValueError("Sandbox ID cannot be empty.")
-
-        return self

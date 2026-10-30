@@ -83,7 +83,7 @@ CODEVIEW_RUNNER_DATABASE_URL=postgresql+psycopg://YOUR_USER:YOUR_PASSWORD@127.0.
 
 sudo docker pull ghcr.io/danielakpa/codeview-developer:dev
 python3 -m pip install fastapi httpx uvicorn               
-
+python3 -m pip install sqlalchemy 
 
 CODEVIEW_CONTROLLER_URL=http://127.0.0.1:9100
 CODEVIEW_CONTROLLER_TOKEN=UE_kd5niJWhUqfTWhOpHnrkBCweB1fHgufw6CdKFG7NgD3lOdjnpksPnr3GasNTL
