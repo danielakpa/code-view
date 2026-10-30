@@ -160,6 +160,60 @@ class CodeExecutionRunnerClient:
         # Django-to-Runner authentication token.
         self.token = settings.CODEVIEW_RUNNER_TOKEN
 
+    async def prepare_sandbox(self, developer_id, group_id):
+        """
+        Ask the FastAPI Runner to prepare a developer's sandbox.
+
+        Django must verify the developer's group membership
+        before calling this method.
+
+        The Runner creates or retrieves the sandbox record.
+        It does not start a permanent Docker container.
+        """
+
+        # STEP 1: Prepare the authentication token.
+        # Only authorized backend services can contact the Runner.
+        headers = {
+            "Authorization": f"Bearer {self.token}",
+        }
+
+        # STEP 2: Prepare the developer's information.
+        # These fields match PrepareSandboxRequest in FastAPI.
+        payload = {
+            "developer_id": developer_id,
+            "group_id": group_id,
+        }
+
+        # STEP 3: Send the preparation request to FastAPI.
+        try:
+            async with httpx.AsyncClient(timeout=15.0) as client:
+
+                response = await client.post(
+                    f"{self.base_url}/internal/sandboxes/prepare",
+                    headers=headers,
+                    json=payload,
+                )
+
+                # Raise an exception if FastAPI rejects the request.
+                response.raise_for_status()
+
+                # STEP 4: Return the sandbox information.
+                return response.json()
+
+        except httpx.HTTPStatusError as error:
+
+            # FastAPI returned an unsuccessful HTTP status.
+            raise RunnerUnavailableError(
+                "Sandbox preparation request was rejected."
+            ) from error
+
+        except httpx.RequestError as error:
+
+            # FastAPI could not be reached or timed out.
+            raise RunnerUnavailableError(
+                "Failed to communicate with the CodeView Runner."
+            ) from error
+            
     async def request_execution(
         self,
         board_id,
