@@ -1221,78 +1221,79 @@ def meeting_room(request, group_id):
 
 @login_required
 def code_board(request, group_id):
-    """Display and save a private development group's code board."""
+    """
+    Display the developer's private Code Board.
+
+    Source code is written and executed directly from the browser.
+    We do not save temporary source code to PostgreSQL.
+    """
+
+    # ========================================================
+    # STEP 1: FIND THE DEVELOPMENT GROUP
+    # ========================================================
 
     group = get_object_or_404(
         ProjectGroup,
         id=group_id,
     )
 
+    # Code Boards are available only in private groups.
     if not group.is_private:
-
         return HttpResponseForbidden(
             "Code boards are only available to private development groups."
         )
 
+    # Developers must belong to the group.
     if not is_group_member(group, request.user):
-
         return HttpResponseForbidden(
             "You must belong to this group to access its code board."
         )
 
-    # Get the private Code Board belonging to the logged-in developer.
-    # Create a new board if this developer does not have one in this group.
+    # ========================================================
+    # STEP 2: GET THE DEVELOPER'S PRIVATE CODE BOARD
+    # ========================================================
+
+    # Keep a board record for ownership and authorization.
+    # The board is no longer used to save temporary source code.
     board, created = GroupCodeBoard.objects.get_or_create(
         group=group,
         owner=request.user,
     )
 
-    if request.method == "POST":
+    # ========================================================
+    # STEP 3: DISABLE THE OLD SAVE CODE ENDPOINT
+    # ========================================================
 
-        title = request.POST.get("title", "").strip()
-        language = request.POST.get("language", "python")
-        code = request.POST.get("code", "")
+    # Reject POST requests to this page.
+    # Code execution uses the separate run_code_board endpoint.
+    if request.method != "GET":
+        return HttpResponseNotAllowed(["GET"])
 
-        valid_languages = [
-            choice[0]
-            for choice in GroupCodeBoard.LANGUAGE_CHOICES
-        ]
+    # ========================================================
+    # STEP 4: FIND THE CONNECTED GITHUB REPOSITORY
+    # ========================================================
 
-        if language not in valid_languages:
-
-            return HttpResponseBadRequest(
-                "Invalid programming language."
-            )
-
-        board.title = title or "Untitled Code"
-        board.language = language
-        board.code = code
-        board.last_edited_by = request.user
-        board.save()
-
-        return redirect(
-            "code_board",
-            group_id=group.id,
-        )
-
-       # Find the GitHub repository connected to this private group.
     repository = GroupRepository.objects.filter(
         group=group,
     ).first()
-        # Prepare an empty list for GitHub branches.
+
+    # Store available GitHub branches.
     branches = []
 
-    # Retrieve branches only when a repository is connected.
+    # ========================================================
+    # STEP 5: RETRIEVE GITHUB BRANCHES
+    # ========================================================
+
     if repository:
 
-        # Build the GitHub API endpoint for repository branches.
+        # Build the GitHub API URL.
         github_url = (
             f"https://api.github.com/repos/"
             f"{repository.github_owner}/"
             f"{repository.repository_name}/branches?per_page=100"
         )
 
-        # Create a request with GitHub's recommended headers.
+        # Create the GitHub API request.
         github_request = Request(
             github_url,
             headers={
@@ -1303,27 +1304,38 @@ def code_board(request, group_id):
 
         try:
 
-            # Request the branch list from GitHub.
+            # Request branches from GitHub.
             with urlopen(github_request, timeout=10) as response:
                 branches_data = json.load(response)
 
-            # Extract each branch name.
+            # Extract branch names.
             branches = [
                 branch["name"]
                 for branch in branches_data
             ]
 
-        except (HTTPError, URLError, TimeoutError, ValueError, KeyError):
+        except (
+            HTTPError,
+            URLError,
+            TimeoutError,
+            ValueError,
+            KeyError,
+        ):
 
-            # Keep the Code Board available if GitHub fails.
+            # Keep CodeView working if GitHub is unavailable.
             branches = []
 
-    # Use the default branch when GitHub returns no branches.
+    # ========================================================
+    # STEP 6: FALLBACK TO THE DEFAULT BRANCH
+    # ========================================================
+
     if repository and not branches:
         branches = [repository.default_branch]
 
-    # Send the group, existing board, and repository to the HTML page.
-        # Render the Code Board with the available GitHub branches.
+    # ========================================================
+    # STEP 7: DISPLAY THE CODE BOARD
+    # ========================================================
+
     return render(
         request,
         "community/code_board.html",

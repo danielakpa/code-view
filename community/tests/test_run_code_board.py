@@ -1,92 +1,65 @@
-"""Tests for CodeView's Code Board Run endpoint."""
+"""Tests for CodeView's browser-based Code Board execution."""
 
-# ============================================================
-# 1. IMPORTS
-# ============================================================
-
-# Mock external services without starting FastAPI or Docker.
 from unittest.mock import AsyncMock, patch
 
-# Get Django's configured user model.
 from django.contrib.auth import get_user_model
-
-# Django's database-backed testing tools.
 from django.test import TestCase
-
-# Generate URLs from Django route names.
 from django.urls import reverse
 
-# Import the Runner communication exception.
+from community.models import ProjectGroup, GroupCodeBoard
 from server_runner.client import RunnerUnavailableError
-
-# Import CodeView database models.
-from community.models import (
-    ProjectGroup,
-    GroupCodeBoard,
-    GroupMember,
-)
 
 
 User = get_user_model()
 
 
-# ============================================================
-# 2. CODE BOARD EXECUTION TESTS
-# ============================================================
-
 class RunCodeBoardTests(TestCase):
-    """Verify Code Board permissions and Runner integration."""
+    """Test permissions, validation, and execution requests."""
 
     def setUp(self):
-        """Prepare developers, a private group, and a Code Board."""
+        """Create developers, a private group, and a Code Board."""
 
-        # Create the developer who owns the group and Code Board.
         self.owner = User.objects.create_user(
             username="developer_one",
             password="TestPassword123!",
         )
 
-        # Create another developer.
         self.other_user = User.objects.create_user(
             username="developer_two",
             password="TestPassword123!",
         )
 
-        # Create a private development group.
         self.group = ProjectGroup.objects.create(
             name="Python Developers",
-            description="A private group for Python developers.",
+            description="A private group for developers.",
             owner=self.owner,
             is_private=True,
             join_policy="approval",
         )
 
-        # Create the owner's Code Board.
         self.board = GroupCodeBoard.objects.create(
             group=self.group,
             owner=self.owner,
             language="python",
-            code='print("Hello CodeView")',
+            code="Old saved code",
         )
 
-        # Build the Run endpoint URL.
         self.url = reverse(
             "run_code_board",
             kwargs={"group_id": self.group.pk},
         )
 
     # ========================================================
-    # TEST 1: AUTHORIZED PYTHON EXECUTION
+    # TEST 1: PYTHON EXECUTION
     # ========================================================
 
     @patch(
         "community.views.CodeExecutionRunnerClient.request_execution",
         new_callable=AsyncMock,
     )
-    def test_owner_can_request_execution(self, mock_execution):
-        """The owner can execute their Code Board through FastAPI."""
+    def test_owner_can_execute_python(self, mock_execution):
+        """The owner can execute Python code from the browser."""
 
-        # Simulate a successful response from FastAPI.
         mock_execution.return_value = {
             "status": "completed",
             "stdout": "Hello CodeView\n",
@@ -94,27 +67,24 @@ class RunCodeBoardTests(TestCase):
             "exit_code": 0,
         }
 
-        # Log in as the Code Board owner.
         self.client.force_login(self.owner)
 
-        # Send a Run Code request to Django.
-        response = self.client.post(self.url)
-
-        # Django should return a successful response.
-        self.assertEqual(response.status_code, 200)
-
-        # Check the execution result.
-        self.assertEqual(
-            response.json()["status"],
-            "completed",
+        response = self.client.post(
+            self.url,
+            {
+                "language": "python",
+                "code": 'print("Hello CodeView")',
+            },
         )
+
+        self.assertEqual(response.status_code, 200)
 
         self.assertEqual(
             response.json()["stdout"],
             "Hello CodeView\n",
         )
 
-        # Verify Django sent the correct information to FastAPI.
+        # Verify the Runner receives browser-submitted code.
         mock_execution.assert_awaited_once_with(
             board_id=self.board.pk,
             developer_id=self.owner.pk,
@@ -123,8 +93,16 @@ class RunCodeBoardTests(TestCase):
             source='print("Hello CodeView")',
         )
 
+        # Verify that execution does not overwrite saved code.
+        self.board.refresh_from_db()
+
+        self.assertEqual(
+            self.board.code,
+            "Old saved code",
+        )
+
     # ========================================================
-    # TEST 2: ANONYMOUS USER
+    # TEST 2: ANONYMOUS DEVELOPER
     # ========================================================
 
     @patch(
@@ -132,41 +110,41 @@ class RunCodeBoardTests(TestCase):
         new_callable=AsyncMock,
     )
     def test_anonymous_user_cannot_execute(self, mock_execution):
-        """Developers must log in before executing code."""
+        """Anonymous users cannot execute code."""
 
-        # Do not log in.
-        response = self.client.post(self.url)
+        response = self.client.post(
+            self.url,
+            {
+                "language": "python",
+                "code": 'print("Hello")',
+            },
+        )
 
-        # Django should redirect to the login page.
         self.assertEqual(response.status_code, 302)
-
-        # No execution request should reach FastAPI.
         mock_execution.assert_not_awaited()
 
     # ========================================================
-    # TEST 3: ANOTHER DEVELOPER'S CODE BOARD
+    # TEST 3: UNAUTHORIZED DEVELOPER
     # ========================================================
 
     @patch(
         "community.views.CodeExecutionRunnerClient.request_execution",
         new_callable=AsyncMock,
     )
-    def test_other_developer_cannot_execute_owner_board(
-        self,
-        mock_execution,
-    ):
-        """Developers cannot execute another developer's Code Board."""
+    def test_other_developer_cannot_execute(self, mock_execution):
+        """A developer cannot execute another owner's board."""
 
-        # Log in as another developer.
         self.client.force_login(self.other_user)
 
-        # Attempt to run the owner's board.
-        response = self.client.post(self.url)
+        response = self.client.post(
+            self.url,
+            {
+                "language": "python",
+                "code": 'print("Unauthorized")',
+            },
+        )
 
-        # Do not reveal another developer's private board.
         self.assertEqual(response.status_code, 404)
-
-        # FastAPI must never receive this request.
         mock_execution.assert_not_awaited()
 
     # ========================================================
@@ -178,14 +156,13 @@ class RunCodeBoardTests(TestCase):
         new_callable=AsyncMock,
     )
     def test_get_request_is_rejected(self, mock_execution):
-        """Code execution must use POST requests."""
+        """Execution must use POST."""
 
         self.client.force_login(self.owner)
 
         response = self.client.get(self.url)
 
         self.assertEqual(response.status_code, 405)
-
         mock_execution.assert_not_awaited()
 
     # ========================================================
@@ -200,19 +177,19 @@ class RunCodeBoardTests(TestCase):
         self,
         mock_execution,
     ):
-        """Reject languages not supported by the Runner."""
-
-        # Change the board to an unsupported language.
-        self.board.language = "java"
-        self.board.save()
+        """Reject unsupported programming languages."""
 
         self.client.force_login(self.owner)
 
-        response = self.client.post(self.url)
+        response = self.client.post(
+            self.url,
+            {
+                "language": "java",
+                "code": 'System.out.println("Hello");',
+            },
+        )
 
         self.assertEqual(response.status_code, 400)
-
-        # Unsupported languages must not reach FastAPI.
         mock_execution.assert_not_awaited()
 
     # ========================================================
@@ -223,42 +200,38 @@ class RunCodeBoardTests(TestCase):
         "community.views.CodeExecutionRunnerClient.request_execution",
         new_callable=AsyncMock,
     )
-    def test_supported_javascript_is_authorized(
-        self,
-        mock_execution,
-    ):
-        """JavaScript Code Boards can request execution."""
+    def test_javascript_execution(self, mock_execution):
+        """JavaScript code can be executed."""
 
-        # Save JavaScript code on the board.
-        self.board.language = "javascript"
-        self.board.code = 'console.log("Hello CodeView");'
-        self.board.save()
-
-        # Simulate the Runner's successful response.
         mock_execution.return_value = {
             "status": "completed",
-            "stdout": "Hello CodeView\n",
+            "stdout": "Hello JavaScript\n",
             "stderr": "",
             "exit_code": 0,
         }
 
         self.client.force_login(self.owner)
 
-        response = self.client.post(self.url)
+        response = self.client.post(
+            self.url,
+            {
+                "language": "javascript",
+                "code": 'console.log("Hello JavaScript");',
+            },
+        )
 
         self.assertEqual(response.status_code, 200)
 
-        # Confirm JavaScript was sent to FastAPI.
         mock_execution.assert_awaited_once_with(
             board_id=self.board.pk,
             developer_id=self.owner.pk,
             group_id=self.group.pk,
             language="javascript",
-            source='console.log("Hello CodeView");',
+            source='console.log("Hello JavaScript");',
         )
 
     # ========================================================
-    # TEST 7: RUNNER SERVICE UNAVAILABLE
+    # TEST 7: RUNNER UNAVAILABLE
     # ========================================================
 
     @patch(
@@ -269,47 +242,113 @@ class RunCodeBoardTests(TestCase):
         self,
         mock_execution,
     ):
-        """Return HTTP 503 when the Runner cannot be reached."""
+        """Handle FastAPI connection failures."""
 
-        # Simulate a network or service failure.
         mock_execution.side_effect = RunnerUnavailableError(
-            "Runner is unavailable."
+            "Runner unavailable."
         )
 
         self.client.force_login(self.owner)
 
-        response = self.client.post(self.url)
+        response = self.client.post(
+            self.url,
+            {
+                "language": "python",
+                "code": 'print("Hello")',
+            },
+        )
 
-        # Django should handle the failure gracefully.
         self.assertEqual(response.status_code, 503)
-
-        # Verify Django attempted execution.
         mock_execution.assert_awaited_once()
 
     # ========================================================
-    # TEST 8: EMPTY SOURCE CODE
+    # TEST 8: EMPTY SOURCE
     # ========================================================
 
     @patch(
         "community.views.CodeExecutionRunnerClient.request_execution",
         new_callable=AsyncMock,
     )
-    def test_empty_source_code_is_rejected(
-        self,
-        mock_execution,
-    ):
-        """Empty source code must not reach the Runner."""
-
-        # Remove the saved source code.
-        self.board.code = ""
-        self.board.save()
+    def test_empty_source_is_rejected(self, mock_execution):
+        """Empty code must not reach FastAPI."""
 
         self.client.force_login(self.owner)
 
-        response = self.client.post(self.url)
+        response = self.client.post(
+            self.url,
+            {
+                "language": "python",
+                "code": "   ",
+            },
+        )
 
-        # Empty source code is invalid.
         self.assertEqual(response.status_code, 400)
-
-        # FastAPI must not receive the request.
         mock_execution.assert_not_awaited()
+
+    # ========================================================
+    # TEST 9: OVERSIZED SOURCE
+    # ========================================================
+
+    @patch(
+        "community.views.CodeExecutionRunnerClient.request_execution",
+        new_callable=AsyncMock,
+    )
+    def test_oversized_source_is_rejected(self, mock_execution):
+        """Reject source code larger than 256 KiB."""
+
+        self.client.force_login(self.owner)
+
+        response = self.client.post(
+            self.url,
+            {
+                "language": "python",
+                "code": "x" * (256 * 1024 + 1),
+            },
+        )
+
+        self.assertEqual(response.status_code, 400)
+        mock_execution.assert_not_awaited()
+
+    # ========================================================
+    # TEST 10: GO EXECUTION
+    # ========================================================
+
+    @patch(
+        "community.views.CodeExecutionRunnerClient.request_execution",
+        new_callable=AsyncMock,
+    )
+    def test_go_execution(self, mock_execution):
+        """Go code can be sent to the Runner."""
+
+        go_code = (
+            'package main\n'
+            'import "fmt"\n'
+            'func main() { fmt.Println("Hello Go") }\n'
+        )
+
+        mock_execution.return_value = {
+            "status": "completed",
+            "stdout": "Hello Go\n",
+            "stderr": "",
+            "exit_code": 0,
+        }
+
+        self.client.force_login(self.owner)
+
+        response = self.client.post(
+            self.url,
+            {
+                "language": "go",
+                "code": go_code,
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+        mock_execution.assert_awaited_once_with(
+            board_id=self.board.pk,
+            developer_id=self.owner.pk,
+            group_id=self.group.pk,
+            language="go",
+            source=go_code,
+        )
