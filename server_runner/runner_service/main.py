@@ -7,6 +7,11 @@
 # Read configuration from environment variables.
 import os
 
+# Prepare or retrieve a developer's private execution sandbox.
+from server_runner.runner_service.sandbox.manager import (
+    SandboxManager,
+)
+
 # Compare authentication tokens securely.
 import secrets
 
@@ -91,6 +96,17 @@ class CreateRunnerSessionRequest(BaseModel):
 
     # Private group containing the developer.
     group_id: int = Field(gt=0)
+
+
+
+class PrepareSandboxRequest(BaseModel):
+    """Identify the developer and group needing a sandbox."""
+
+    # Developer authenticated and authorized by Django.
+    developer_id: int = Field(gt=0, strict=True)
+
+    # Private development group verified by Django.
+    group_id: int = Field(gt=0, strict=True)
 
 
 # ============================================================
@@ -234,6 +250,63 @@ def create_runner_session(
             detail="Runner database operation failed.",
         )
 
+# ============================================================
+# PREPARE DEVELOPER EXECUTION SANDBOX
+# ============================================================
+
+@app.post("/internal/sandboxes/prepare")
+def prepare_developer_sandbox(
+    request: PrepareSandboxRequest,
+    authenticated: bool = Depends(verify_runner_token),
+    db: Session = Depends(get_db),
+):
+    """
+    Prepare a developer's private sandbox for code execution.
+
+    Django must authenticate the developer and verify group membership
+    before calling this internal endpoint.
+
+    This endpoint creates or retrieves sandbox metadata.
+    It does not start a permanent Docker container.
+    """
+
+    try:
+        # STEP 1: Initialize our existing sandbox manager.
+        manager = SandboxManager()
+
+        # STEP 2: Find or create the developer's sandbox record.
+        # Also prepare the developer's private workspace.
+        sandbox, workspace_path = manager.get_or_prepare_sandbox(
+            db=db,
+            developer_id=request.developer_id,
+            group_id=request.group_id,
+        )
+
+        # STEP 3: Return the sandbox information.
+        # Do not expose the host filesystem path to Django.
+        return {
+            "sandbox_id": str(sandbox.sandbox_id),
+            "developer_id": sandbox.developer_id,
+            "group_id": sandbox.group_id,
+            "status": sandbox.status,
+        }
+
+    except ValueError as error:
+        # Reject invalid developer or group information.
+        raise HTTPException(
+            status_code=400,
+            detail=str(error),
+        ) from error
+
+    except (SQLAlchemyError, OSError) as error:
+        # Undo any uncommitted database changes.
+        db.rollback()
+
+        # Avoid exposing internal database or filesystem details.
+        raise HTTPException(
+            status_code=503,
+            detail="Sandbox preparation failed.",
+        ) from error
 
 # ============================================================
 # 10. DISCONNECT RUNNER SESSION
