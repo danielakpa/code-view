@@ -1,67 +1,76 @@
 """Client for communicating with the CodeView Runner Service."""
 
-# Read configuration from Django settings.
+# ============================================================
+# 1. IMPORTS
+# ============================================================
+
+# Read Runner configuration from Django settings.
 from django.conf import settings
 
-# HTTPX allows Python applications to make HTTP requests.
+# Make asynchronous HTTP requests.
 import httpx
 
 
-class RunnerUnavailableError(Exception):
-    """Raised when the runner service cannot be reached or fails."""
+# ============================================================
+# 2. CUSTOM EXCEPTION
+# ============================================================
 
+class RunnerUnavailableError(Exception):
+    """Raised when communication with the Runner fails."""
+
+
+# ============================================================
+# 3. TERMINAL RUNNER CLIENT
+# ============================================================
 
 class TerminalRunnerClient:
-    """Handle communication between Django and the runner service."""
+    """Handle communication between Django and terminal services."""
 
     def __init__(self):
-        """Configure the runner service connection."""
+        """Configure the Runner connection."""
 
-        # Read the runner service URL from Django settings.
+        # Runner service address.
         self.base_url = settings.CODEVIEW_RUNNER_URL.rstrip("/")
 
-        # Read the shared authentication token.
+        # Shared authentication token.
         self.token = settings.CODEVIEW_RUNNER_TOKEN
 
     async def get_status(self):
-        """Check the authenticated runner service status."""
+        """Check the authenticated Runner service status."""
 
-        # Include the secret token in the Authorization header.
         headers = {
             "Authorization": f"Bearer {self.token}",
         }
 
         try:
-            # Create an asynchronous HTTP client.
             async with httpx.AsyncClient(timeout=10.0) as client:
 
-                # Send an authenticated request to the runner.
                 response = await client.get(
                     f"{self.base_url}/internal/status",
                     headers=headers,
                 )
 
-                # Raise an error if the request failed.
                 response.raise_for_status()
 
-                # Return the JSON response as a Python dictionary.
                 return response.json()
 
         except httpx.HTTPError as error:
-            # Convert network and HTTP errors into our own exception.
             raise RunnerUnavailableError(
                 "CodeView Runner Service is unavailable."
             ) from error
-            
-    async def create_session(self, session_id, developer_id, group_id):
+
+    async def create_session(
+        self,
+        session_id,
+        developer_id,
+        group_id,
+    ):
         """Register a developer terminal session with FastAPI."""
 
-        # Prepare authentication headers.
         headers = {
-            "Authorization": f"Bearer {self.token}"
+            "Authorization": f"Bearer {self.token}",
         }
 
-        # Prepare the terminal session information.
         payload = {
             "session_id": str(session_id),
             "developer_id": developer_id,
@@ -69,24 +78,19 @@ class TerminalRunnerClient:
         }
 
         try:
-            # Create an asynchronous HTTP client.
             async with httpx.AsyncClient(timeout=10.0) as client:
 
-                # Send the session information to FastAPI.
                 response = await client.post(
                     f"{self.base_url}/internal/sessions",
                     headers=headers,
                     json=payload,
                 )
 
-                # Raise an error if FastAPI rejects the request.
                 response.raise_for_status()
 
-                # Return FastAPI's response to Django.
                 return response.json()
 
         except httpx.HTTPError as error:
-            # Handle connection failures and HTTP errors.
             raise RunnerUnavailableError(
                 "Failed to register terminal session with FastAPI."
             ) from error
@@ -94,29 +98,23 @@ class TerminalRunnerClient:
     async def disconnect_session(self, session_id):
         """Notify FastAPI when a developer disconnects."""
 
-        # Send the authentication token to FastAPI.
         headers = {
-            "Authorization": f"Bearer {self.token}"
+            "Authorization": f"Bearer {self.token}",
         }
 
         try:
-            # Create an asynchronous HTTP client.
             async with httpx.AsyncClient(timeout=10.0) as client:
 
-                # Send the session ID to FastAPI.
                 response = await client.post(
                     f"{self.base_url}/internal/sessions/{session_id}/disconnect",
                     headers=headers,
                 )
 
-                # Raise an error if FastAPI rejects the request.
                 response.raise_for_status()
 
-                # Return FastAPI's response.
                 return response.json()
 
         except httpx.HTTPError as error:
-            # Handle connection failures and HTTP errors.
             raise RunnerUnavailableError(
                 "Failed to notify FastAPI about terminal disconnection."
             ) from error
@@ -124,83 +122,128 @@ class TerminalRunnerClient:
     async def send_heartbeat(self, session_id):
         """Send a terminal session heartbeat to FastAPI."""
 
-        # Include the authentication token.
         headers = {
-            "Authorization": f"Bearer {self.token}"
+            "Authorization": f"Bearer {self.token}",
         }
 
         try:
-            # Create an asynchronous HTTP client.
             async with httpx.AsyncClient(timeout=10.0) as client:
 
-                # Send the heartbeat request to FastAPI.
                 response = await client.post(
                     f"{self.base_url}/internal/sessions/{session_id}/heartbeat",
                     headers=headers,
                 )
 
-                # Raise an error if FastAPI rejects the request.
                 response.raise_for_status()
 
-                # Return FastAPI's response.
                 return response.json()
 
         except httpx.HTTPError as error:
-            # Handle network and HTTP errors.
             raise RunnerUnavailableError(
                 "Failed to send terminal heartbeat."
             ) from error
 
 
+# ============================================================
+# 4. CODE EXECUTION RUNNER CLIENT
+# ============================================================
+
 class CodeExecutionRunnerClient:
-    """Communicate with FastAPI about Code Board execution."""
+    """Send authorized Code Board execution requests to FastAPI."""
 
     def __init__(self):
-        """Load the Runner connection settings."""
+        """Configure the execution Runner connection."""
 
-        # FastAPI Runner's base URL.
+        # Runner service URL.
         self.base_url = settings.CODEVIEW_RUNNER_URL.rstrip("/")
 
-        # Shared authentication token for Django-to-Runner requests.
+        # Django-to-Runner authentication token.
         self.token = settings.CODEVIEW_RUNNER_TOKEN
 
-    async def request_execution(self, board_id, developer_id, group_id):
+    async def request_execution(
+        self,
+        board_id,
+        developer_id,
+        group_id,
+        language,
+        source,
+    ):
         """
-        Request execution of an authorized developer's Code Board.
+        Request execution of a developer's Code Board.
 
-        The FastAPI execution endpoint will be implemented later.
+        Django must verify the developer's permissions before
+        calling this method.
+
+        Args:
+            board_id: ID of the Code Board.
+            developer_id: ID of the developer.
+            group_id: ID of the private group.
+            language: Programming language to execute.
+            source: Source code to execute.
+
+        Returns:
+            Dictionary containing the execution result.
         """
 
-        # Send Django's service authentication token.
+        # ----------------------------------------------------
+        # STEP 1: PREPARE AUTHENTICATION
+        # ----------------------------------------------------
+
         headers = {
             "Authorization": f"Bearer {self.token}",
         }
 
-        # Identify the Code Board and its authorized owner.
+        # ----------------------------------------------------
+        # STEP 2: PREPARE EXECUTION DATA
+        # ----------------------------------------------------
+
+        # These fields must match CodeExecutionRequest
+        # in runner_service/execution_request.py.
         payload = {
             "board_id": board_id,
             "developer_id": developer_id,
             "group_id": group_id,
+            "language": language,
+            "source": source,
         }
 
-        try:
-            # Create an asynchronous HTTP client.
-            async with httpx.AsyncClient(timeout=10.0) as client:
+        # ----------------------------------------------------
+        # STEP 3: SEND REQUEST TO FASTAPI
+        # ----------------------------------------------------
 
-                # Request code execution from FastAPI.
+        try:
+            # Code execution may take longer than terminal requests.
+            async with httpx.AsyncClient(timeout=45.0) as client:
+
                 response = await client.post(
                     f"{self.base_url}/internal/executions",
                     headers=headers,
                     json=payload,
                 )
 
-                # Reject unsuccessful HTTP responses.
+                # Raise an exception for unsuccessful responses.
                 response.raise_for_status()
 
-                # Return FastAPI's response.
+                # ------------------------------------------------
+                # STEP 4: RETURN THE EXECUTION RESULT
+                # ------------------------------------------------
+
                 return response.json()
 
-        except httpx.HTTPError as error:
+        except httpx.HTTPStatusError as error:
+
+            # FastAPI rejected the request.
+            #
+            # Preserve the original HTTP status on the cause
+            # so Django can distinguish authorization errors
+            # from execution infrastructure failures.
             raise RunnerUnavailableError(
-                "Failed to request Code Board execution."
+                "Code Board execution request was rejected."
+            ) from error
+
+        except httpx.RequestError as error:
+
+            # FastAPI could not be reached or the request timed out.
+            raise RunnerUnavailableError(
+                "Failed to communicate with the CodeView Runner."
             ) from error

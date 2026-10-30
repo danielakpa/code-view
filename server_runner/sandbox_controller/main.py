@@ -4,7 +4,6 @@
 # 1. IMPORTS
 # ============================================================
 
-# FastAPI components.
 from fastapi import (
     Depends,
     FastAPI,
@@ -12,41 +11,44 @@ from fastapi import (
     Request,
 )
 
-# Pydantic validation errors.
 from pydantic import ValidationError
 
-# SQLAlchemy database errors and sessions.
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
-# Controller authentication.
+# Authentication for internal Controller requests.
 from server_runner.sandbox_controller.authentication import (
     verify_controller_token,
 )
 
-# Existing controller service.
+# Existing Controller service.
 from server_runner.sandbox_controller.service import (
     SandboxControllerService,
 )
 
-# Database session dependency.
+# Database dependency.
 from server_runner.runner_service.database import (
     get_db,
 )
 
-# Validate incoming code execution requests.
+# Request validation.
 from server_runner.sandbox_controller.execution_request import (
     ControllerExecutionRequest,
 )
 
-# Authorize sandbox operations and prevent replay attacks.
+# Sandbox authorization and lifecycle handling.
 from server_runner.sandbox_controller.operation_handler import (
     SandboxOperationHandler,
 )
 
-# Execute code using the existing Docker execution system.
+# Docker execution pipeline.
 from server_runner.sandbox_controller.code_execution_pipeline import (
     CodeExecutionPipeline,
+)
+
+# Replay-protection exception.
+from server_runner.sandbox_controller.replay import (
+    ReplayProtectionError,
 )
 
 
@@ -57,7 +59,7 @@ from server_runner.sandbox_controller.code_execution_pipeline import (
 app = FastAPI(
     title="CodeView Sandbox Controller",
 
-    # Disable automatic API documentation endpoints.
+    # Disable automatic API documentation.
     docs_url=None,
     redoc_url=None,
     openapi_url=None,
@@ -72,33 +74,25 @@ controller = SandboxControllerService()
 
 
 # ============================================================
-# 4. HEALTH CHECK ENDPOINT
+# 4. HEALTH CHECK
 # ============================================================
 
 @app.get("/health")
 def health_check():
-    """
-    Return the controller's health status.
-
-    This endpoint does not expose secrets or Docker operations.
-    """
+    """Return the Controller's health status."""
 
     return controller.health_check()
 
 
 # ============================================================
-# 5. SECURITY SUMMARY ENDPOINT
+# 5. SECURITY SUMMARY
 # ============================================================
 
 @app.get("/internal/security")
 def security_summary(
     authenticated: bool = Depends(verify_controller_token),
 ):
-    """
-    Return security configuration to an authenticated service.
-
-    The authentication dependency must succeed first.
-    """
+    """Return security information to an authenticated service."""
 
     return controller.get_security_summary()
 
@@ -111,37 +105,34 @@ def security_summary(
 async def execute_code(
     http_request: Request,
 
-    # Verify the internal Controller token before processing.
+    # Authenticate the internal calling service.
     authenticated: bool = Depends(verify_controller_token),
 
-    # Provide a database session for authorization.
+    # Provide the database session.
     db: Session = Depends(get_db),
 ):
     """
-    Authorize and execute source code in a temporary Docker container.
+    Authorize and execute code in a temporary Docker container.
 
-    Execution flow:
-
-    1. Authenticate the calling service.
-    2. Validate the JSON request.
-    3. Verify sandbox ownership and lifecycle status.
-    4. Prevent replayed operation requests.
-    5. Execute code using the Docker pipeline.
-    6. Return the execution result.
+    Steps:
+        1. Authenticate the calling service.
+        2. Validate the execution request.
+        3. Verify sandbox ownership and lifecycle.
+        4. Prevent replayed requests.
+        5. Execute the source code.
+        6. Return the execution result.
     """
 
     # --------------------------------------------------------
-    # STEP 1: VALIDATE THE REQUEST BODY
+    # STEP 1: VALIDATE THE REQUEST
     # --------------------------------------------------------
 
     try:
-        # Read the incoming JSON request.
+        # Read the incoming JSON body.
         request_body = await http_request.body()
 
-        # Validate JSON using Pydantic.
-        #
-        # JSON validation correctly handles UUID strings
-        # even when strict validation is enabled.
+        # Use JSON validation so strict UUID fields accept
+        # correctly formatted UUID strings.
         execution_request = (
             ControllerExecutionRequest.model_validate_json(
                 request_body
@@ -150,31 +141,36 @@ async def execute_code(
 
     except ValidationError as error:
 
-        # Return a validation error without exposing
-        # unnecessary internal application details.
         raise HTTPException(
             status_code=422,
             detail="Invalid code execution request.",
         ) from error
 
     # --------------------------------------------------------
-    # STEP 2: AUTHORIZE THE SANDBOX OPERATION
+    # STEP 2: AUTHORIZE AND RECORD THE OPERATION
     # --------------------------------------------------------
 
     try:
-        # Create the operation handler.
+        # Initialize the operation handler.
         operation_handler = SandboxOperationHandler(db)
 
-        # Verify ownership, lifecycle rules, and replay protection.
-        #
-        # This records the authorized operation in PostgreSQL.
+        # Verify sandbox ownership, lifecycle, and replay protection.
         operation_handler.handle(
             execution_request.operation_request
         )
 
+    # IMPORTANT:
+    # Catch ReplayProtectionError before PermissionError
+    # because ReplayProtectionError may inherit from it.
+    except ReplayProtectionError as error:
+
+        raise HTTPException(
+            status_code=409,
+            detail=str(error),
+        ) from error
+
     except PermissionError as error:
 
-        # Reject requests that cannot access the sandbox.
         raise HTTPException(
             status_code=403,
             detail=str(error),
@@ -182,7 +178,6 @@ async def execute_code(
 
     except ValueError as error:
 
-        # Reject invalid sandbox lifecycle operations.
         raise HTTPException(
             status_code=409,
             detail=str(error),
@@ -190,7 +185,6 @@ async def execute_code(
 
     except SQLAlchemyError as error:
 
-        # Database failures prevent authorization.
         raise HTTPException(
             status_code=503,
             detail="Sandbox authorization database unavailable.",
@@ -201,10 +195,10 @@ async def execute_code(
     # --------------------------------------------------------
 
     try:
-        # Initialize the existing Docker execution pipeline.
+        # Initialize the Docker execution pipeline.
         pipeline = CodeExecutionPipeline()
 
-        # Run code in a temporary Docker container.
+        # Execute the developer's source code.
         result = pipeline.execute(
             sandbox_id=execution_request.operation_request.sandbox_id,
             language=execution_request.language,
@@ -216,7 +210,6 @@ async def execute_code(
 
     except ValueError as error:
 
-        # Reject invalid execution parameters.
         raise HTTPException(
             status_code=422,
             detail=str(error),
@@ -224,7 +217,6 @@ async def execute_code(
 
     except RuntimeError as error:
 
-        # Report Docker execution infrastructure failures.
         raise HTTPException(
             status_code=503,
             detail="Code execution service unavailable.",

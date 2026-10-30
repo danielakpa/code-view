@@ -8,6 +8,9 @@
 # Reuse CodeView's Code Board execution authorization.
 from server_runner.services import authorize_code_board_execution
 
+# Call the authenticated FastAPI Runner after Django authorizes a board.
+from server_runner.client import CodeExecutionRunnerClient, RunnerUnavailableError
+
 # Used to convert JSON data into Python dictionaries and lists.
 import json
 
@@ -1336,70 +1339,74 @@ def code_board(request, group_id):
 @login_required
 @require_POST
 def run_code_board(request, group_id):
-    """
-    Validate a developer's request to execute their private Code Board.
+    """Authorize and execute the logged-in developer's saved Code Board."""
 
-    Note:
-    This endpoint does not execute code yet.
-    """
-
-    # Step 1: Find the logged-in developer's Code Board.
+    # Step 1: Find only this developer's board in the requested group.
     board = GroupCodeBoard.objects.filter(
         group_id=group_id,
         owner=request.user,
     ).first()
 
-    # Step 2: Reject requests without an owned Code Board.
     if board is None:
         return JsonResponse(
             {"error": "Code Board not found or access denied."},
             status=404,
         )
 
+    # Step 2: Reuse the existing server-side authorization checks.
     try:
-        # Step 3: Verify group access and Code Board ownership.
         authorized_board = authorize_code_board_execution(
             user=request.user,
             board_id=board.pk,
         )
-
     except PermissionError:
-        # Never reveal another developer's private Code Board.
         return JsonResponse(
             {"error": "Code Board not found or access denied."},
             status=403,
         )
 
-    # Step 4: Only these languages are supported by the Runner.
-    supported_languages = {
-        "python",
-        "go",
-        "javascript",
-    }
-
-    # Step 5: Reject unsupported programming languages.
-    if authorized_board.language not in supported_languages:
+    # Step 3: Only execute languages supported by the Runner.
+    if authorized_board.language not in {"python", "go", "javascript"}:
         return JsonResponse(
-            {
-                "error": (
-                    "Code execution currently supports "
-                    "Python, Go, and JavaScript."
-                )
-            },
+            {"error": "Code execution supports Python, Go, and JavaScript."},
             status=400,
         )
 
-    # Step 6: Confirm authorization.
-    # Docker execution will be connected in a later step.
-    return JsonResponse(
-        {
-            "status": "authorized",
-            "message": "Code Board is authorized for execution.",
-            "board_id": authorized_board.pk,
-            "language": authorized_board.language,
-        },
-        status=200,
-    )
+    # Step 4: Validate saved source before contacting the Runner.
+    source = authorized_board.code
+    if not isinstance(source, str) or not source.strip():
+        return JsonResponse(
+            {"error": "Save non-empty source code before running it."},
+            status=400,
+        )
+    if len(source.encode("utf-8")) > 256 * 1024:
+        return JsonResponse(
+            {"error": "Source code exceeds the 256 KiB limit."},
+            status=400,
+        )
+
+    # Step 5: Django is synchronous here; bridge to the async HTTP client.
+    # IDs and source are read from authorized server-side records,
+    # not from user-submitted developer/group identifiers.
+    runner = CodeExecutionRunnerClient()
+    try:
+        result = async_to_sync(runner.request_execution)(
+            board_id=authorized_board.pk,
+            developer_id=request.user.pk,
+            group_id=authorized_board.group_id,
+            language=authorized_board.language,
+            source=source,
+        )
+    except RunnerUnavailableError:
+        # Avoid exposing internal service addresses, tokens, or errors.
+        return JsonResponse(
+            {"error": "Code execution is temporarily unavailable."},
+            status=503,
+        )
+
+    # Step 6: Return the Runner's structured execution result.
+    return JsonResponse(result, status=200)
+
 # ============================================================
 # 10. CREATE GROUP DISCUSSION
 # ============================================================
