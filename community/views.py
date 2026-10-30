@@ -1259,6 +1259,29 @@ def code_board(request, group_id):
         group=group,
         owner=request.user,
     )
+        # ========================================================
+    # STEP 3: PREPARE THE DEVELOPER'S EXECUTION SANDBOX
+    # ========================================================
+
+    # Ask the FastAPI Runner to prepare a private sandbox.
+    # The developer's group membership has already been verified.
+    try:
+        sandbox = async_to_sync(
+            CodeExecutionRunnerClient().prepare_sandbox
+        )(
+            developer_id=request.user.pk,
+            group_id=group.pk,
+        )
+
+    except RunnerUnavailableError:
+
+        # Display an error if the Runner cannot prepare the sandbox.
+        # Do not expose internal service errors to the developer.
+        return HttpResponse(
+            "CodeView could not prepare your development environment. "
+            "Please try again.",
+            status=503,
+        )
 
     # ========================================================
     # STEP 3: DISABLE THE OLD SAVE CODE ENDPOINT
