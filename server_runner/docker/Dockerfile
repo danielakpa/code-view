@@ -33,8 +33,31 @@ RUN useradd \
 RUN mkdir -p /workspace && \
     chown developer:developer /workspace
 
-# Run as a non-root user.
+# ==========================================
+# PREPARE GO BUILD CACHE
+# ==========================================
+
+# Store precompiled Go dependencies in the image.
+# This location remains readable when the container
+# runs with a read-only filesystem.
+ENV GOCACHE=/opt/codeview/go-cache
+
+# Create the cache directory.
+RUN mkdir -p /opt/codeview/go-cache && \
+    chown -R developer:developer /opt/codeview/go-cache
+
+# Switch to the unprivileged developer.
 USER developer
+
+# Compile a small Go program during image creation.
+# This warms Go's build cache, including packages
+# commonly required by simple Go programs.
+RUN mkdir -p /tmp/codeview-go-warmup && \
+    printf 'package main\nimport "fmt"\nfunc main() { fmt.Println("ready") }\n' \
+        > /tmp/codeview-go-warmup/main.go && \
+    cd /tmp/codeview-go-warmup && \
+    go build -o /tmp/codeview-go-warmup/app main.go && \
+    rm -rf /tmp/codeview-go-warmup
 
 # Set the default working directory.
 WORKDIR /workspace

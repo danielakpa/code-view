@@ -102,10 +102,10 @@ class DockerRuntime:
             # Run the container as an unprivileged user.
             "--user",
             "10001:10001",
-
-            # Provide a temporary writable /tmp directory.
+            # Provide temporary storage for Go compilation.
+            # Storage is temporary and disappears with the container.
             "--tmpfs",
-            "/tmp:rw,nosuid,nodev,size=64m",
+            "/tmp:rw,nosuid,nodev,size=256m",
 
             # Mount the developer's private workspace.
             "--mount",
@@ -362,7 +362,16 @@ class DockerRuntime:
             "10001:10001",
 
             "--tmpfs",
-            "/tmp:rw,nosuid,nodev,size=64m",
+            "/tmp:rw,exec,nosuid,nodev,size=512m",
+
+            # Give Go a writable location for its compilation cache.
+            "--env",
+            "GOCACHE=/opt/codeview/go-cache",
+
+
+            # Give Go a writable location for temporary compilation files.
+            "--env",
+            "GOTMPDIR=/tmp",
 
             # Prevent modifications to the developer's source files.
             "--mount",

@@ -81,12 +81,12 @@ class TemporaryContainerExecutor:
         cleanup_error = None
 
         try:
-            # Create the temporary container.
+            # STEP 1: Create the temporary Docker container.
             created = subprocess.run(
                 create_command,
                 capture_output=True,
                 text=True,
-                timeout=15,
+                timeout=45,
                 check=True,
             )
 
@@ -96,14 +96,14 @@ class TemporaryContainerExecutor:
             # Validate the Docker-generated container ID.
             self.runtime._validate_container_id(container_id)
 
-            # Build the command to start the container.
+            # STEP 2: Build the command to start the container.
             start_command = (
                 self.runtime.build_temporary_start_command(
                     container_id
                 )
             )
 
-            # Start the container and collect its output.
+            # STEP 3: Start the container and collect its output.
             process = subprocess.Popen(
                 start_command,
                 stdout=subprocess.PIPE,
@@ -119,7 +119,7 @@ class TemporaryContainerExecutor:
                     timeout=timeout
                 )
 
-                # Save the execution result.
+                # Save the successful execution result.
                 result = TemporaryContainerResult(
                     return_code=process.returncode,
                     stdout=stdout,
@@ -130,31 +130,44 @@ class TemporaryContainerExecutor:
             except subprocess.TimeoutExpired:
                 # The program exceeded the execution time limit.
 
-                # Terminate the Docker container itself.
-                subprocess.run(
-                    self.runtime.build_temporary_kill_command(
-                        container_id
-                    ),
-                    capture_output=True,
-                    text=True,
-                    timeout=10,
-                    check=True,
-                )
+                # STEP 4: Try to stop the Docker container.
+                # Docker kill may fail if the container already stopped.
+                try:
+                    subprocess.run(
+                        self.runtime.build_temporary_kill_command(
+                            container_id
+                        ),
+                        capture_output=True,
+                        text=True,
+                        timeout=10,
+                        check=False,
+                    )
 
-                # Terminate the host-side Docker process.
+                except (OSError, subprocess.SubprocessError):
+                    # Continue stopping the host-side Docker process.
+                    pass
+
+                # STEP 5: Terminate the host-side Docker process.
                 if process.poll() is None:
                     try:
                         os.killpg(
                             process.pid,
                             signal.SIGKILL,
                         )
+
                     except ProcessLookupError:
                         pass
 
-                # Collect any remaining output.
-                stdout, stderr = process.communicate(
-                    timeout=5
-                )
+                # STEP 6: Collect any remaining output.
+                try:
+                    stdout, stderr = process.communicate(
+                        timeout=5
+                    )
+
+                except subprocess.TimeoutExpired as error:
+                    raise TemporaryContainerExecutionError(
+                        "Docker client did not terminate after timeout."
+                    ) from error
 
                 # Save the timeout result.
                 result = TemporaryContainerResult(
@@ -170,7 +183,7 @@ class TemporaryContainerExecutor:
             execution_error = error
 
         finally:
-            # STEP 1: Stop the host-side Docker process
+            # STEP 7: Stop the host-side Docker process
             # if it is still running.
             if process is not None and process.poll() is None:
                 try:
@@ -188,7 +201,7 @@ class TemporaryContainerExecutor:
                 ):
                     pass
 
-            # STEP 2: Remove the temporary container.
+            # STEP 8: Remove the temporary container.
             # Use its unique name so cleanup still works
             # if Docker created it but failed to return its ID.
             cleanup_target = container_name
@@ -207,8 +220,8 @@ class TemporaryContainerExecutor:
                     check=False,
                 )
 
-                # STEP 3: Verify that the container no longer exists.
-                # STEP 3: Ask Docker to list the exact container name.
+                # STEP 9: Verify that the container no longer exists.
+                # Ask Docker to list the exact container name.
                 list_result = subprocess.run(
                     self.runtime.build_temporary_list_command(
                         container_name
