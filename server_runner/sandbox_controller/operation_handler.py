@@ -127,16 +127,6 @@ class SandboxOperationHandler:
                 # Temporary execution does not change the sandbox status.
                 new_status = sandbox.status
 
-            elif request.operation == SandboxOperation.CREATE:
-
-                # Creating a sandbox is handled separately.
-                # Do not create duplicate sandbox records here.
-                if sandbox.status != "prepared":
-                    raise ValueError(
-                        "Sandbox is already prepared or active."
-                    )
-
-                new_status = sandbox.status
 
             elif request.operation == SandboxOperation.CREATE:
 
